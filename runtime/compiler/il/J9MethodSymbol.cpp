@@ -177,6 +177,12 @@ static TR::RecognizedMethod canSkipNullChecks[] =
    TR::java_lang_String_equalsIgnoreCase,
    TR::java_lang_String_indexOf_fast,
    TR::java_lang_String_isCompressed,
+
+   TR::java_lang_String_decompress_BIBII,
+   TR::java_lang_String_decompress_CIBII,
+   TR::java_lang_String_decompress_BICII,
+   TR::java_lang_String_decompress_CICII,
+
    TR::java_lang_StringBuffer_capacityInternal,
    TR::java_lang_StringBuffer_lengthInternalUnsynchronized,
    TR::java_lang_StringBuilder_capacityInternal,
@@ -259,6 +265,12 @@ static TR::RecognizedMethod canSkipBoundChecks[] =
    TR::java_lang_String_hashCodeImplCompressed,
    TR::java_lang_String_hashCodeImplDecompressed,
    TR::java_lang_String_unsafeCharAt,
+
+   TR::java_lang_String_decompress_BIBII,
+   TR::java_lang_String_decompress_CIBII,
+   TR::java_lang_String_decompress_BICII,
+   TR::java_lang_String_decompress_CICII,
+
    TR::java_lang_String_split_str_int,
    TR::java_util_Hashtable_get,
    TR::java_util_Hashtable_put,
