@@ -99,6 +99,12 @@ J9::Z::CodeGenerator::initialize()
       cg->setSupportsInlineStringHashCode();
       }
 
+   static bool enableStringLatin1 = (feGetEnv("TR_EnableStringLatin1InflateInline") != NULL);
+   if (cg->getSupportsVectorRegisters() && enableStringLatin1 && comp->target().cpu.isAtLeast(OMR_PROCESSOR_S390_Z14))
+      {
+      cg->setSupportsInlineStringLatin1Inflate();
+      }
+
    // See comment in `handleHardwareReadBarrier` implementation as to why we cannot support CTX under CS
    if (cg->getSupportsTM() && TR::Compiler->om.readBarrierType() == gc_modron_readbar_none)
       {
@@ -3828,6 +3834,7 @@ extern TR::Register* inlineConcurrentLinkedQueueTMOffer(TR::Node *node, TR::Code
 extern TR::Register* inlineConcurrentLinkedQueueTMPoll(TR::Node *node, TR::CodeGenerator *cg);
 
 extern TR::Register* inlineStringHashCode(TR::Node *node, TR::CodeGenerator *cg, bool isCompressed);
+extern TR::Register* inlineStringLatin1Inflate(TR::Node *node, TR::CodeGenerator *cg);
 extern TR::Register* inlineUTF16BEEncodeSIMD(TR::Node *node, TR::CodeGenerator *cg);
 extern TR::Register* inlineUTF16BEEncode    (TR::Node *node, TR::CodeGenerator *cg);
 
@@ -4050,6 +4057,13 @@ J9::Z::CodeGenerator::inlineDirectCall(
             }
         break;
 
+      case TR::java_lang_StringLatin1_inflate:
+         if (cg->getSupportsInlineStringLatin1Inflate())
+            {
+            resultReg = inlineStringLatin1Inflate(node, cg);
+	    return true;
+            }
+      break;
       case TR::com_ibm_jit_JITHelpers_transformedEncodeUTF16Big:
          return resultReg = comp->getOption(TR_DisableUTF16BEEncoder) ? inlineUTF16BEEncodeSIMD(node, cg)
                                                                       : inlineUTF16BEEncode    (node, cg);
