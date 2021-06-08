@@ -93,6 +93,224 @@ extern TR::Register * iDivRemGenericEvaluator(TR::Node * node, TR::CodeGenerator
 extern TR::Instruction * generateS390CompareOps(TR::Node * node, TR::CodeGenerator * cg, TR::InstOpCode::S390BranchCondition fBranchOpCond, TR::InstOpCode::S390BranchCondition rBranchOpCond, TR::LabelSymbol * targetLabel);
 
 TR::Register*
+J9::Z::TreeEvaluator::inlineStringLatin1Inflate(TR::Node *node, TR::CodeGenerator *cg)
+   {
+   TR_ASSERT_FATAL(cg->getSupportsInlineStringLatin1Inflate(), "DCDCDCDCD --  string latin 1 inflate NOT supported for inlining\n");
+   TR::Compilation *comp = cg->comp();
+   TR::Node *sourceArrayReferenceNode = node->getChild(0);
+   TR::Node *srcOffNode = node->getChild(1);
+   TR::Node *charArrayReferenceNode = node->getChild(2);
+   TR::Node *dstOffNode = node->getChild(3);
+   TR::Node *lenNode = node->getChild(4);
+
+   TR::LabelSymbol *cFlowRegionStart  = generateLabelSymbol(cg);
+   TR::LabelSymbol *cFlowRegionEnd  = generateLabelSymbol(cg);
+   TR::LabelSymbol *handleResidueLabel = generateLabelSymbol(cg);
+   TR::LabelSymbol *vectorLoopStart = generateLabelSymbol(cg);
+   TR::LabelSymbol *gprSequenceLabel = generateLabelSymbol(cg);
+
+   TR::RegisterDependencyConditions* dependencies = new (cg->trHeapMemory()) TR::RegisterDependencyConditions(0, 17, cg);
+
+   TR::Register *lenRegister = cg->evaluate(lenNode);
+   generateS390CompareAndBranchInstruction(cg, TR::InstOpCode::C, node, lenRegister, 0, TR::InstOpCode::COND_BE, cFlowRegionEnd, false, false);
+   TR::Register *sourceArrayReferenceRegister = cg->gprClobberEvaluate(sourceArrayReferenceNode); 
+   TR::Register *srcOffRegister = cg->gprClobberEvaluate(srcOffNode);
+   TR::Register *charArrayReferenceRegister = cg->gprClobberEvaluate(charArrayReferenceNode);
+   TR::Register *dstOffRegister = cg->gprClobberEvaluate(dstOffNode);
+
+   TR::Register *sourceArrayReferenceRegister2 = cg->allocateRegister();
+   generateRRInstruction(cg, TR::InstOpCode::XGR, node, sourceArrayReferenceRegister2, sourceArrayReferenceRegister2); // TODO This is probably not needed 
+   generateRRInstruction(cg, TR::InstOpCode::LGR, node, sourceArrayReferenceRegister2, sourceArrayReferenceRegister);
+
+   bool srcOffsetIsConstant = (srcOffNode->getOpCodeValue() == TR::iconst);
+   bool dstOffsetIsConstant = (dstOffNode->getOpCodeValue() == TR::iconst);
+   
+   if (srcOffsetIsConstant)
+      {
+      if (srcOffNode->getInt() != 0)
+         {
+         generateRILInstruction(cg, TR::InstOpCode::AFI, node, sourceArrayReferenceRegister, srcOffNode->getInt());
+	 }
+      }
+   else
+      {
+      generateRRInstruction(cg, TR::InstOpCode::AGFR, node, sourceArrayReferenceRegister, srcOffRegister);
+      }
+
+   if (dstOffsetIsConstant)
+      {
+      if (dstOffNode->getInt() != 0)
+         {
+         generateRILInstruction(cg, TR::InstOpCode::AFI, node, charArrayReferenceRegister, dstOffNode->getInt() * 2);
+	 }
+      }
+   else
+      {
+      generateRSInstruction(cg, TR::InstOpCode::SLAK, node, dstOffRegister, dstOffRegister, 1);
+      generateRRInstruction(cg, TR::InstOpCode::AGFR, node, charArrayReferenceRegister, dstOffRegister);
+      }
+
+   TR::MemoryReference *charArrayReferenceMemRefLow = generateS390MemoryReference(charArrayReferenceRegister, TR::Compiler->om.contiguousArrayHeaderSizeInBytes(), cg);
+   TR::MemoryReference *charArrayReferenceMemRefHigh = generateS390MemoryReference(charArrayReferenceRegister, TR::Compiler->om.contiguousArrayHeaderSizeInBytes() + 16, cg);
+
+   TR::Register *numCharsMinusResidue = cg->allocateRegister();
+   generateRRInstruction(cg, TR::InstOpCode::LR, node, numCharsMinusResidue, lenRegister);
+   generateRILInstruction(cg, TR::InstOpCode::SLFI, node, numCharsMinusResidue, 16);
+   generateRRInstruction(cg, TR::InstOpCode::AR, node, numCharsMinusResidue, srcOffRegister);
+
+   generateS390LabelInstruction(cg, TR::InstOpCode::label, node, cFlowRegionStart);
+   cFlowRegionStart->setStartInternalControlFlow();
+   generateS390CompareAndBranchInstruction(cg, TR::InstOpCode::C, node, lenRegister, 8, TR::InstOpCode::COND_BL, gprSequenceLabel, false, false);
+
+   generateS390LabelInstruction(cg, TR::InstOpCode::label, node, vectorLoopStart);
+   generateS390CompareAndBranchInstruction(cg, TR::InstOpCode::CR, node, srcOffRegister, numCharsMinusResidue, TR::InstOpCode::COND_BH, handleResidueLabel, false, false);
+   uint8_t lengthToStore = TR_VECTOR_REGISTER_SIZE - 1;
+   TR::Register* registerV1 = cg->allocateRegister(TR_VRF);
+   TR::MemoryReference *sourceArrayMemRef = generateS390MemoryReference(sourceArrayReferenceRegister, TR::Compiler->om.contiguousArrayHeaderSizeInBytes(), cg);
+   generateVRXInstruction(cg, TR::InstOpCode::VL, node, registerV1, sourceArrayMemRef);
+   TR::Register* registerV2 = cg->allocateRegister(TR_VRF);
+   TR::Register* registerV3 = cg->allocateRegister(TR_VRF);
+   // Unpack the 1st and 2nd halves of the input vector
+   generateVRRaInstruction(cg, TR::InstOpCode::VUPLH, node, registerV2, registerV1);
+   generateVRRaInstruction(cg, TR::InstOpCode::VUPLL, node, registerV3, registerV1);
+
+   generateVRXInstruction(cg, TR::InstOpCode::VST, node, registerV2, charArrayReferenceMemRefLow);
+
+   generateVRXInstruction(cg, TR::InstOpCode::VST, node, registerV3, charArrayReferenceMemRefHigh);
+
+   // Done storing 16 chars. Now do some bookkeeping and then branch back to start label
+   generateRILInstruction(cg, TR::InstOpCode::AFI, node, srcOffRegister, 16);
+   generateRILInstruction(cg, TR::InstOpCode::AFI, node, sourceArrayReferenceRegister, 16);
+   generateRILInstruction(cg, TR::InstOpCode::AFI, node, charArrayReferenceRegister, 32);
+   generateS390BranchInstruction(cg, TR::InstOpCode::BRC, TR::InstOpCode::COND_BRC, node, vectorLoopStart);
+
+   generateS390LabelInstruction(cg, TR::InstOpCode::label, node, handleResidueLabel);
+
+   TR::MemoryReference *sourceArrayMemRef2 = generateS390MemoryReference(sourceArrayReferenceRegister2, TR::Compiler->om.contiguousArrayHeaderSizeInBytes(), cg);
+   TR::MemoryReference *charArrayReferenceMemRefLow2 = generateS390MemoryReference(charArrayReferenceRegister, TR::Compiler->om.contiguousArrayHeaderSizeInBytes(), cg);
+   TR::MemoryReference *charArrayReferenceMemRefHigh2 = generateS390MemoryReference(charArrayReferenceRegister, TR::Compiler->om.contiguousArrayHeaderSizeInBytes() + 16, cg);
+
+   // get number of characters remaining to process
+   TR::Register *quoRegister = cg->allocateRegister();
+
+   // Do lenRegister / 16 to calculate remaining number of chars using the Divide Logical (DLR) instruction.
+   // The dividend in a DLR instruction is a 64-bit integer. The top half is in remRegister, and the bottom half is in quoRegister.
+   // In our case the dividend is always a 32-bit integer (i.e. the length of the array). So we must always zero out the top half (i.e. remRegister) in order to make sure the dividend is never corrupted.
+   // The bottom half doesn't need to be zeroed out because we move a 32-bit integer in it, and then never use that register again.
+   TR::Register *remRegister = cg->allocateRegister();
+   generateRRInstruction(cg, TR::InstOpCode::XGR, node, remRegister, remRegister);
+   TR::RegisterPair *divRegisterPair = cg->allocateConsecutiveRegisterPair(quoRegister, remRegister); // rem is legal even of the pair
+   generateRRInstruction(cg, TR::InstOpCode::LR, node, quoRegister, lenRegister);
+   TR::Register *divisor = cg->allocateRegister();
+   generateRILInstruction(cg, TR::InstOpCode::LGFI, node, divisor, 16);
+   
+   generateRRInstruction(cg, TR::InstOpCode::DLR, node, divRegisterPair, divisor);
+   // Branch to end if length was a multiple of 16
+   generateS390CompareAndBranchInstruction(cg, TR::InstOpCode::C, node, remRegister, 0, TR::InstOpCode::COND_BE, cFlowRegionEnd, false, false);
+   // Now do srcOffRegister = lenRegister - remRegister to position index at the next character that we need to copy.
+   generateRRRInstruction(cg, TR::InstOpCode::SRK, node, srcOffRegister, lenRegister, remRegister);
+   // Now add that result to the base register
+   generateRRInstruction(cg, TR::InstOpCode::AGFR, node, sourceArrayReferenceRegister2, srcOffRegister);
+   // now that you have the new index and the number of remaining characters, load those many chars into registerV1. We are guaranteed to have numChars < 16
+   generateVRXInstruction(cg, TR::InstOpCode::VL, node, registerV1, sourceArrayMemRef2);
+   // Now unpack the low order. If we have less than 8 chars to process, thre will be zeros in the register
+   generateVRRaInstruction(cg, TR::InstOpCode::VUPLH, node, registerV2, registerV1);
+   // multiply numChars remaining by 2 to get the number of bytes we need to write
+   TR::Register *tempReg = cg->allocateRegister();
+   generateRSInstruction(cg, TR::InstOpCode::SLAK, node, tempReg, remRegister, 1);
+   // subtract one from tempReg since the byte position is 0 based.
+   generateRILInstruction(cg, TR::InstOpCode::SLFI, node, tempReg, 1);
+   generateVRSbInstruction(cg, TR::InstOpCode::VSTL, node, registerV2, tempReg, charArrayReferenceMemRefLow2, 0);
+   // Now subtract numChars by 8 and see if there's still more bytes left to write
+   generateRILInstruction(cg, TR::InstOpCode::SLFI, node, remRegister, 8);
+   generateS390CompareAndBranchInstruction(cg, TR::InstOpCode::C, node, remRegister, 0, TR::InstOpCode::COND_BNH, cFlowRegionEnd, false, false);
+   // If we didn't branch, then there are still more characters to process. And the remaining amount is in remRegister.
+   // So unpack the characters and store back in memory
+   generateVRRaInstruction(cg, TR::InstOpCode::VUPLL, node, registerV3, registerV1);
+   generateRSInstruction(cg, TR::InstOpCode::SLAK, node, tempReg, remRegister, 1);
+   generateRILInstruction(cg, TR::InstOpCode::SLFI, node, tempReg, 1);
+   generateVRSbInstruction(cg, TR::InstOpCode::VSTL, node, registerV3, tempReg, charArrayReferenceMemRefHigh2, 0);
+   generateS390BranchInstruction(cg, TR::InstOpCode::BRC, TR::InstOpCode::COND_BRC, node, cFlowRegionEnd);
+
+   generateS390LabelInstruction(cg, TR::InstOpCode::label, node, gprSequenceLabel);
+   TR::Register *scratchReg = cg->allocateRegister();
+   TR::Register *scratchReg2 = cg->allocateRegister();
+
+   generateRSInstruction(cg, TR::InstOpCode::SLAK, node, scratchReg2, lenRegister, 1);
+   generateRSInstruction(cg, TR::InstOpCode::SLAK, node, scratchReg, lenRegister, 3);
+   generateRRInstruction(cg, TR::InstOpCode::AR, node, scratchReg2, scratchReg);
+   // Load one byte at a time using LLC, then store it as a char
+   // If we are here, then lenRegister is less than remaining chars is in numCharsMinusResidue.
+   // First we figure out exactly how many chars are left.
+   generateRILInstruction(cg, TR::InstOpCode::LARL, node, scratchReg, cFlowRegionEnd);
+
+   generateRRInstruction(cg, TR::InstOpCode::SR, node, scratchReg, scratchReg2);
+   TR::Instruction *cursor = generateS390RegInstruction(cg, TR::InstOpCode::BCR, node, scratchReg);
+   ((TR::S390RegInstruction *)cursor)->setBranchCondition(TR::InstOpCode::COND_BCR);
+
+   // 7 chars left
+   generateRXInstruction(cg, TR::InstOpCode::LLC, node, scratchReg, generateS390MemoryReference(sourceArrayReferenceRegister, TR::Compiler->om.contiguousArrayHeaderSizeInBytes() + 6, cg));
+   generateRXInstruction(cg, TR::InstOpCode::STH, node, scratchReg, generateS390MemoryReference(charArrayReferenceRegister, TR::Compiler->om.contiguousArrayHeaderSizeInBytes() + 12, cg));
+   // 6 chars left
+   generateRXInstruction(cg, TR::InstOpCode::LLC, node, scratchReg, generateS390MemoryReference(sourceArrayReferenceRegister, TR::Compiler->om.contiguousArrayHeaderSizeInBytes() + 5, cg));
+   generateRXInstruction(cg, TR::InstOpCode::STH, node, scratchReg, generateS390MemoryReference(charArrayReferenceRegister, TR::Compiler->om.contiguousArrayHeaderSizeInBytes() + 10, cg));
+   // 5 chars left
+   generateRXInstruction(cg, TR::InstOpCode::LLC, node, scratchReg, generateS390MemoryReference(sourceArrayReferenceRegister, TR::Compiler->om.contiguousArrayHeaderSizeInBytes() + 4, cg));
+   generateRXInstruction(cg, TR::InstOpCode::STH, node, scratchReg, generateS390MemoryReference(charArrayReferenceRegister, TR::Compiler->om.contiguousArrayHeaderSizeInBytes() + 8, cg));
+   // 4 chars left
+   generateRXInstruction(cg, TR::InstOpCode::LLC, node, scratchReg, generateS390MemoryReference(sourceArrayReferenceRegister, TR::Compiler->om.contiguousArrayHeaderSizeInBytes() + 3, cg));
+   generateRXInstruction(cg, TR::InstOpCode::STH, node, scratchReg, generateS390MemoryReference(charArrayReferenceRegister, TR::Compiler->om.contiguousArrayHeaderSizeInBytes() + 6, cg));
+   // 3 chars left
+   generateRXInstruction(cg, TR::InstOpCode::LLC, node, scratchReg, generateS390MemoryReference(sourceArrayReferenceRegister, TR::Compiler->om.contiguousArrayHeaderSizeInBytes() + 2, cg));
+   generateRXInstruction(cg, TR::InstOpCode::STH, node, scratchReg, generateS390MemoryReference(charArrayReferenceRegister, TR::Compiler->om.contiguousArrayHeaderSizeInBytes() + 4, cg));
+   // 2 chars left
+   generateRXInstruction(cg, TR::InstOpCode::LLC, node, scratchReg, generateS390MemoryReference(sourceArrayReferenceRegister, TR::Compiler->om.contiguousArrayHeaderSizeInBytes() + 1, cg));
+   generateRXInstruction(cg, TR::InstOpCode::STH, node, scratchReg, generateS390MemoryReference(charArrayReferenceRegister, TR::Compiler->om.contiguousArrayHeaderSizeInBytes() + 2, cg));
+   // 1 chars left
+   generateRXInstruction(cg, TR::InstOpCode::LLC, node, scratchReg, generateS390MemoryReference(sourceArrayReferenceRegister, TR::Compiler->om.contiguousArrayHeaderSizeInBytes() + 0, cg));
+   generateRXInstruction(cg, TR::InstOpCode::STH, node, scratchReg, generateS390MemoryReference(charArrayReferenceRegister, TR::Compiler->om.contiguousArrayHeaderSizeInBytes() + 0, cg));
+
+   dependencies->addPostConditionIfNotAlreadyInserted(scratchReg, TR::RealRegister::AssignAny);
+   dependencies->addPostConditionIfNotAlreadyInserted(scratchReg2, TR::RealRegister::AssignAny);
+   dependencies->addPostConditionIfNotAlreadyInserted(sourceArrayReferenceRegister, TR::RealRegister::AssignAny);
+   dependencies->addPostConditionIfNotAlreadyInserted(lenRegister, TR::RealRegister::AssignAny);
+   dependencies->addPostConditionIfNotAlreadyInserted(srcOffRegister, TR::RealRegister::AssignAny);
+   dependencies->addPostConditionIfNotAlreadyInserted(dstOffRegister, TR::RealRegister::AssignAny);
+   dependencies->addPostConditionIfNotAlreadyInserted(charArrayReferenceRegister, TR::RealRegister::AssignAny);
+   dependencies->addPostConditionIfNotAlreadyInserted(numCharsMinusResidue, TR::RealRegister::AssignAny);
+   dependencies->addPostConditionIfNotAlreadyInserted(registerV1, TR::RealRegister::AssignAny);
+   dependencies->addPostConditionIfNotAlreadyInserted(registerV2, TR::RealRegister::AssignAny);
+   dependencies->addPostConditionIfNotAlreadyInserted(registerV3, TR::RealRegister::AssignAny);
+   dependencies->addPostConditionIfNotAlreadyInserted(divRegisterPair, TR::RealRegister::EvenOddPair);
+   dependencies->addPostConditionIfNotAlreadyInserted(remRegister, TR::RealRegister::LegalEvenOfPair);
+   dependencies->addPostConditionIfNotAlreadyInserted(quoRegister, TR::RealRegister::LegalOddOfPair);
+   dependencies->addPostConditionIfNotAlreadyInserted(tempReg, TR::RealRegister::AssignAny);
+   dependencies->addPostConditionIfNotAlreadyInserted(divisor, TR::RealRegister::AssignAny);
+   dependencies->addPostConditionIfNotAlreadyInserted(sourceArrayReferenceRegister2, TR::RealRegister::AssignAny);
+
+   generateS390LabelInstruction(cg, TR::InstOpCode::label, node, cFlowRegionEnd, dependencies);
+   cFlowRegionEnd->setEndInternalControlFlow();
+
+   cg->decReferenceCount(srcOffNode);
+   cg->decReferenceCount(dstOffNode);
+   cg->decReferenceCount(lenNode);
+   cg->decReferenceCount(sourceArrayReferenceNode);
+   cg->decReferenceCount(charArrayReferenceNode);
+
+   cg->stopUsingRegister(numCharsMinusResidue);
+   cg->stopUsingRegister(scratchReg);
+   cg->stopUsingRegister(scratchReg2);
+   cg->stopUsingRegister(registerV1);
+   cg->stopUsingRegister(registerV2);
+   cg->stopUsingRegister(registerV3);
+   cg->stopUsingRegister(divRegisterPair);
+   cg->stopUsingRegister(tempReg);
+   cg->stopUsingRegister(divisor);
+   cg->stopUsingRegister(sourceArrayReferenceRegister2);
+   return NULL;
+   }
+
+TR::Register*
 J9::Z::TreeEvaluator::zdloadEvaluator(TR::Node *node, TR::CodeGenerator *cg)
    {
    return TR::TreeEvaluator::pdloadEvaluator(node, cg);
