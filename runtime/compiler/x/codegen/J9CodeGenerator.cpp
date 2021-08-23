@@ -75,7 +75,11 @@ J9::X86::CodeGenerator::initialize()
    if (!TR::Compiler->om.canGenerateArraylets())
       {
       cg->setSupportsReferenceArrayCopy();
-      cg->setSupportsInlineStringLatin1Inflate();
+      static bool disableStringInflate = feGetEnv("TR_DisableStringInflate") != NULL;
+      if (!disableStringInflate)
+         {
+         cg->setSupportsInlineStringLatin1Inflate();
+         }
       }
 
    if (comp->requiresSpineChecks())
