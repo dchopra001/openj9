@@ -86,6 +86,23 @@ class RecognizedCallTransformer : public OMR::RecognizedCallTransformer
     */
    void process_java_lang_Class_IsAssignableFrom(TR::TreeTop* treetop, TR::Node* node);
    /** \brief
+    *     Transforms java/lang/StringCoding.encodeASCII(B[B)[B into an arraytranslate tree if string compress is enabled.
+    *
+    *  \param treetop
+    *     The treetop which anchors the call node.
+    *
+    *  \param node
+    *     The call node representing a call to java/lang/StringCoding.encodeASCII(B[B)[B which has the following shape:
+    *
+    *     \code
+    *     acall <java/lang/StringUTF16.toBytes([CII)[B>
+    *       <coder>
+    *       <val>
+    *     \endcode
+    */
+   void process_java_lang_StringCoding_encodeASCII(TR::TreeTop* treetop, TR::Node* node);
+   void process_java_lang_StringCoding_encodeASCII_2(TR::TreeTop* treetop, TR::Node* node);
+   /** \brief
     *     Transforms java/lang/StringUTF16.toBytes([CII)[B into a fast allocate and arraycopy sequence with equivalent
     *     semantics.
     *
