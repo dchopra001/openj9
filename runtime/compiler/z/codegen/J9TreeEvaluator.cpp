@@ -118,7 +118,7 @@ J9::Z::TreeEvaluator::inlineStringLatin1Inflate(TR::Node *node, TR::CodeGenerato
       {
       if (srcOffNode->getInt() != 0)
          {
-         generateRILInstruction(cg, TR::InstOpCode::AFI, node, sourceArrayReferenceRegister, srcOffNode->getInt());
+         generateRILInstruction(cg, cg->comp()->target().is64Bit() ? TR::InstOpCode::AGFI : TR::InstOpCode::AFI, node, sourceArrayReferenceRegister, srcOffNode->getInt());
          }
       }
    else
@@ -130,7 +130,7 @@ J9::Z::TreeEvaluator::inlineStringLatin1Inflate(TR::Node *node, TR::CodeGenerato
       {
       if (dstOffNode->getInt() != 0)
          {
-         generateRILInstruction(cg, TR::InstOpCode::AFI, node, charArrayReferenceRegister, dstOffNode->getInt() * 2);
+         generateRILInstruction(cg, cg->comp()->target().is64Bit() ? TR::InstOpCode::AGFI : TR::InstOpCode::AFI, node, charArrayReferenceRegister, dstOffNode->getInt() * 2);
          }
       }
    else
@@ -189,8 +189,8 @@ J9::Z::TreeEvaluator::inlineStringLatin1Inflate(TR::Node *node, TR::CodeGenerato
 
    // Done storing 16 chars. Now do some bookkeeping and then branch back to start label.
    generateRILInstruction(cg, TR::InstOpCode::AFI, node, srcOffRegister, 16);
-   generateRILInstruction(cg, TR::InstOpCode::AFI, node, sourceArrayReferenceRegister, 16);
-   generateRILInstruction(cg, TR::InstOpCode::AFI, node, charArrayReferenceRegister, 32);
+   generateRILInstruction(cg, cg->comp()->target().is64Bit() ? TR::InstOpCode::AGFI : TR::InstOpCode::AFI, node, sourceArrayReferenceRegister, 16);
+   generateRILInstruction(cg, cg->comp()->target().is64Bit() ? TR::InstOpCode::AGFI : TR::InstOpCode::AFI, node, charArrayReferenceRegister, 32);
    generateS390BranchInstruction(cg, TR::InstOpCode::BRC, TR::InstOpCode::COND_BRC, node, vectorLoopStart);
 
    // Once we reach this label, only the residual characters need to be processed.
