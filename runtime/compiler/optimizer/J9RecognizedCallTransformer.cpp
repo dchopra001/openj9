@@ -1236,7 +1236,7 @@ bool J9::RecognizedCallTransformer::isInlineable(TR::TreeTop* treetop)
          case TR::java_lang_Long_reverseBytes:
             return comp()->cg()->supportsByteswap();
          case TR::java_lang_StringCoding_encodeASCII:
-            return comp()->target().cpu.isZ() && comp()->getOption(TR_EnableInlineEncodeASCII);
+            return comp()->target().cpu.isZ();
          default:
             return false;
          }
