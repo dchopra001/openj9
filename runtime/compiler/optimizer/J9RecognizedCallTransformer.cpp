@@ -78,18 +78,161 @@ void J9::RecognizedCallTransformer::process_java_lang_Class_IsAssignableFrom(TR:
    fromClass->recursivelyDecReferenceCount();
    }
 
-// This methods inlines a call node that calls StringCoding.encodeASCII into an if-diamond. The forward path of the
-// if-diamond inlines the calland the fallback path reverts back to calling the method in the traditional way.
+
 void J9::RecognizedCallTransformer::process_java_lang_StringCoding_encodeASCII(TR::TreeTop* treetop, TR::Node* node)
    {
+   TR_J9VMBase *fej9 = static_cast<TR_J9VMBase*>(comp()->fe());
+   TR_OpaqueClassBlock *stringClass = fej9->getClassFromSignature("java/lang/String", 16, comp()->getCurrentMethod());
+   if (stringClass == NULL)
+      return;
+   uint8_t *latin1FieldAddress = (uint8_t *)fej9->getStaticFieldAddress(stringClass, (unsigned char *) "LATIN1", 6, (unsigned char *)"B", 1);
+   TR::CFG *cfg = comp()->getFlowGraph();
+
+   TR::Node *coderNode = node->getChild(0);
+   TR::Node *sourceArrayNode = node->getChild(1);
+
+   // Anchor the source array node as we need it in the fallthrough block.
+   anchorNode(sourceArrayNode, treetop);
+
+   // Now generate the ificmpne tree and insert it before the original call tree.
+   TR::Node *constNode = TR::Node::create(node, TR::iconst, 0, (uint8_t)*latin1FieldAddress);
+   TR::Node *ifCmpNode = TR::Node::createif(TR::ificmpne, coderNode, constNode);
+   TR::TreeTop *ifCmpTreeTop = TR::TreeTop::create(comp(), treetop->getPrevTreeTop(), ifCmpNode);
+
+   // Now we split the current block right before the call (or after the ificmpne).
+   TR::Block *ifCmpBlock = ifCmpTreeTop->getEnclosingBlock();
+   TR::Block *fallbackPathBlock = ifCmpBlock->split(treetop, cfg, true /* fixUpCommoning */, true /* copyExceptionSuccessors */);
+
+   TR::Block *tailBlock = fallbackPathBlock->split(treetop->getNextTreeTop(), cfg, true /* fixUpCommoning */, true /* copyExceptionSuccessors */);
+   // Now we have the originalBlock, the fallback block and the merge block (tail block). The original and fallback blocks have commoned nodes.
+   // The fallback block and tail block have commoned nodes as well. The call result will be an astore as well.
+
+   // If this worked correctly, then the treetop after the call node should be an astore.
+   TR::Node *resultStoreNode = treetop->getNextTreeTop()->getNode();
+   TR::SymbolReference *tempSlotForCallResult = NULL;
+   if (resultStoreNode->getOpCode().getOpCodeValue() == TR::astore)
+      {
+      tempSlotForCallResult = resultStoreNode->getSymbolReference();
+      }
+   // Now we have a symbol reference
+   TR_ASSERT_FATAL(tempSlotForCallResult, "DCDCDCDC - symbol reference for store node can't be null\n");
+
+   // Now we create our fallthrough block. Connect it to ifCmpTreeTop, and then split it with nodes commoned.
+   int32_t byteArrayType = fej9->getNewArrayTypeFromClass(fej9->getByteArrayClass());
+
+   // Create a new arraylength node.
+   TR::Node *lenNode = TR::Node::create(node, TR::arraylength, 1, sourceArrayNode);
+
+   // Create the destination array
+   TR::Node *destinationArrayNode = TR::Node::createWithSymRef(node, TR::newarray, 2, comp()->getSymRefTab()->findOrCreateNewArraySymbolRef(node->getSymbolReference()->getOwningMethodSymbol(comp())));
+   destinationArrayNode->setAndIncChild(0, lenNode);
+   destinationArrayNode->setAndIncChild(1, TR::Node::iconst(byteArrayType));
+   TR::TreeTop *destinationArrayTreeTop = TR::TreeTop::create(comp(), TR::Node::create(node, TR::treetop, 1, destinationArrayNode));
+   ifCmpTreeTop->insertAfter(destinationArrayTreeTop); // We will eventually split at this tree top.
+
+
+   // Split at the newarray node. 
+   destinationArrayNode->setCanSkipZeroInitialization(true);
+   destinationArrayNode->setIsNonNull(true);
+   //TR::Block *forwardBranchBlock = ifCmpBlock->split(destinationArrayTreeTop, cfg, false /* fixUpCommoning */, true /* copyExceptionSuccessors */);
+   //forwardBranchBlock->setIsExtensionOfPreviousBlock(false); // TODO: Are these needed?
+   //
+   //
+
+   // Now we have the length node, and also the destination array. Now we need to recreate the to translate the array using arraytranslate.
+   /*
+   // tree looks as follows:
+   // arraytranslate
+   //    input ptr
+   //    output ptr
+   //    translation table
+   //    termCharNode i.e stop character for table based methods
+   //    input length (in elements)
+   //    stoppingNode for SIMD/non-table based methods. Can take on values from -1 to 0xFFFF
+   */
+
+   // The value of the call node should be number of characters translated.
+   TR::Node *arraytranslateNode = TR::Node::create(node, TR::arraytranslate, 6);
+   arraytranslateNode->setSymbolReference(comp()->getSymRefTab()->findOrCreateArrayTranslateSymbol());
+
+   arraytranslateNode->setAndIncChild(0, sourceArrayNode);
+   arraytranslateNode->setAndIncChild(1, destinationArrayNode);
+
+   uint8_t table[256];
+   int i;
+   for (i = 0 ; i < 128; i++)
+      {
+      table[i] = i;
+      }
+   for (i = 128; i < 256; i++)
+      {
+      table[i] = 63; // 63 is the decimal equivalent of '?' in ASCII
+      }
+   TR::Node *tableNode = createTableLoad(comp(), node, 8, 8, table, false);
+   arraytranslateNode->setAndIncChild(2, tableNode);
+   arraytranslateNode->setTableBackedByRawStorage(true);
+   arraytranslateNode->setTermCharNodeIsHint(false);
+   arraytranslateNode->setTargetIsByteArrayTranslate(true);
+   arraytranslateNode->setSourceIsByteArrayTranslate(true);
+
+   int termChar = 256;
+   TR::Node *termCharNode = TR::Node::create(node, TR::iconst, 0, termChar);
+   arraytranslateNode->setAndIncChild(3, termCharNode);
+
+   arraytranslateNode->setAndIncChild(4, lenNode);
+   arraytranslateNode->setAndIncChild(5, TR::Node::create(node, TR::iconst, 0, 256));
+
+   TR::TreeTop *arrayTranslateTreeTop = TR::TreeTop::create(comp(), TR::Node::create(node, TR::treetop, 1, arraytranslateNode));
+   destinationArrayTreeTop->insertAfter(arrayTranslateTreeTop);
+
+   TR::Node *storeNode = TR::Node::createWithSymRef(node, TR::astore, 1, destinationArrayNode, tempSlotForCallResult);
+   TR::TreeTop *storeNodeTreeTop = TR::TreeTop::create(comp(), arrayTranslateTreeTop, storeNode);
+
+   // Now split starting from destinationArrayTreeTop and common up the nodes.
+   TR::Block *fallthroughBlock = destinationArrayTreeTop->getEnclosingBlock()->split(destinationArrayTreeTop, cfg, true /* fixUpCommoning */, true /* copyExceptionSuccessors */);
+
+   // Now create a node to go to the merge block.
+   TR::Node *gotoNode = TR::Node::create(node, TR::Goto);
+   //TR::TreeTop *gotoNodeTreeTop = TR::TreeTop::create(comp(), storeNodeTreeTop->getNextTreeTop(), gotoNode);
+   TR::TreeTop *gotoTree = TR::TreeTop::create(comp(), gotoNode, NULL, NULL);
+   
+   gotoNode->setBranchDestination(tailBlock->getEntry());
+   fallthroughBlock->getExit()->insertBefore(gotoTree);
+
+   // Now we have fallthrough block, fallback block and tail/merge block. Let's set the ifcmp's destination to the fallback block, and update the CFG as well.
+   ifCmpNode->setBranchDestination(fallbackPathBlock->getEntry());
+
+   cfg->addEdge(ifCmpTreeTop->getEnclosingBlock(), fallbackPathBlock);
+   cfg->addEdge(fallthroughBlock, tailBlock);
+   //fallbackPathBlock->setIsExtensionOfPreviousBlock(false);
+   cfg->removeEdge(fallthroughBlock, fallbackPathBlock);
+   }
+
+// This methods inlines a call node that calls StringCoding.encodeASCII into an if-diamond. The forward path of the
+// if-diamond inlines the calland the fallback path reverts back to calling the method in the traditional way.
+//void J9::RecognizedCallTransformer::process_java_lang_StringCoding_encodeASCII(TR::TreeTop* treetop, TR::Node* node)
+
+//void random(TR::TreeTop* treetop, TR::Node* node)
+//   {
 
 
    /*
     * Convert the following call:
     *
     * (n23n) acall StringCoding.encodeASCII
-    *            bload (coder)
+    *            iload (coder)
     *            aload (source byte array)
+    *
+    *
+    *
+    * n128n     BBStart <block_17>
+    * n149n     treetop
+    * n148n       acall  java/lang/StringCoding.encodeASCII(B[B)[B
+    * n146n         iload  coder
+    * n147n         aload  val
+    * n150n     astore  <pending push temp 0>
+    * n148n       ==>acall
+    * n129n     BBEnd </block_17>
     *
     * To:
     *                                 ____________________________
@@ -101,7 +244,7 @@ void J9::RecognizedCallTransformer::process_java_lang_StringCoding_encodeASCII(T
     *                                              |                                                          |
     *                                              | Fall through path                                        | Fall back path
     *                                              |                                                          |
-    *                               _______________|_________________                       __________________|_________________                  
+    *                               _______________|_________________                       __________________|_________________
     *                              |     newarray                    |                     |    call StringCoding.encodeASCII   |
     *                              |      arraytranslate (doEncoding)|                     |    store <temp slot 4>             |
     *                              |         ==>newarray             |                     |       ==>call                      |
@@ -122,16 +265,23 @@ void J9::RecognizedCallTransformer::process_java_lang_StringCoding_encodeASCII(T
     *                                                             | (n23n)load <temp slot 4> |
     *                                                             |__________________________|
     */
- 
+ /*
    TR_J9VMBase* fej9 = static_cast<TR_J9VMBase*>(comp()->fe());
+   TR_OpaqueClassBlock *stringClass = fej9->getClassFromSignature("java/lang/String", 16, comp()->getCurrentMethod());
+   if (stringClass == NULL)
+      return;
+   uint8_t *latin1FieldAddress = (uint8_t *)fej9->getStaticFieldAddress(stringClass, (unsigned char *) "LATIN1", 6, (unsigned char *)"B", 1);
+
    TR::Node* coderNode = node->getChild(0);
    TR::Node* valueNode = node->getChild(1);
 
 
+   // Create a new call node for use in the fallback block.
    TR::SymbolReference *newNodeSymRef = getSymRefTab()->methodSymRefFromName(comp()->getMethodSymbol(), "java/lang/StringCoding", "encodeASCII", "(B[B)[B", TR::MethodSymbol::Static);
    TR::Node *newCallNode = TR::Node::createWithSymRef(node, TR::acall, 2,
                               getSymRefTab()->methodSymRefFromName(comp()->getMethodSymbol(), "java/lang/StringCoding", "encodeASCII", "(B[B)[B", TR::MethodSymbol::Static)); // TODO: Or alternatively we can use node->getSymbolReference() here?
 
+   // Create fresh copies of children.
    TR::Node* newCallNodeChild1 =TR::Node::createWithSymRef(node, coderNode->getOpCodeValue(), 0, coderNode->getSymbolReference());
    TR::Node* newCallNodeChild2 =TR::Node::createWithSymRef(node, valueNode->getOpCodeValue(), 0, valueNode->getSymbolReference());
    newCallNode->setAndIncChild(0, newCallNodeChild1);
@@ -141,8 +291,6 @@ void J9::RecognizedCallTransformer::process_java_lang_StringCoding_encodeASCII(T
    prepareToReplaceNode(node);
 
    // Now create an ifbcmpeq with coderNode and Latin1's value BEFORE the original tree.
-   TR_OpaqueClassBlock *stringClass = fej9->getClassFromSignature("java/lang/String", 16, comp()->getCurrentMethod());
-   uint8_t *latin1FieldAddress = (uint8_t *)fej9->getStaticFieldAddress(stringClass, (unsigned char *) "LATIN1", 6, (unsigned char *)"B", 1);
    TR::Node *constNode = TR::Node::create(node, comp()->il.opCodeForConst(coderNode->getDataType()), 0, (uint8_t)*latin1FieldAddress);
    TR::Node *coderNodeForCmp = TR::Node::createWithSymRef(node, coderNode->getOpCodeValue(), 0, coderNode->getSymbolReference());
    TR::Node *ifCmpNode = TR::Node::createif(comp()->il.opCodeForIfCompareNotEquals(coderNode->getDataType()), coderNodeForCmp, constNode);
@@ -153,7 +301,7 @@ void J9::RecognizedCallTransformer::process_java_lang_StringCoding_encodeASCII(T
    TR::TreeTop *aloadAutoSlotTreeTop = treetop;
 
    // This will now split the original callNode from the ifcmpBlock.
-   TR::Block *aloadAutoSlotNodeBlock = ifCmpBlock->split(aloadAutoSlotTreeTop, cfg, false /* fixUpCommoning */, true /* copyExceptionSuccessors */);
+   TR::Block *aloadAutoSlotNodeBlock = ifCmpBlock->split(aloadAutoSlotTreeTop, cfg, false, true);
    //
    // Now create a new block which is the fallthrough block (new array, arraytranslate astore etc...) and insert it after the ifcmpBlock.
  
@@ -173,11 +321,11 @@ void J9::RecognizedCallTransformer::process_java_lang_StringCoding_encodeASCII(T
    // Split at the newarray node. 
    destinationArrayNode->setCanSkipZeroInitialization(true);
    destinationArrayNode->setIsNonNull(true);
-   TR::Block *forwardBranchBlock = ifCmpBlock->split(destinationArrayTreeTop, cfg, false /* fixUpCommoning */, true /* copyExceptionSuccessors */);
+   TR::Block *forwardBranchBlock = ifCmpBlock->split(destinationArrayTreeTop, cfg, false, true);
    forwardBranchBlock->setIsExtensionOfPreviousBlock(false); // TODO: Are these needed?
 
    // Now we have the length node, and also the destination array. Now we need to recreate the to translate the array using arraytranslate.
-   /*
+   
    // tree looks as follows:
    // arraytranslate
    //    input ptr
@@ -186,7 +334,7 @@ void J9::RecognizedCallTransformer::process_java_lang_StringCoding_encodeASCII(T
    //    termCharNode i.e stop character for table based methods
    //    input length (in elements)
    //    stoppingNode for SIMD/non-table based methods. Can take on values from -1 to 0xFFFF
-   */
+   
 
    // The value of the call node should be number of characters translated.
    TR::Node *arraytranslateNode = TR::Node::create(node, TR::arraytranslate, 6);
@@ -224,12 +372,12 @@ void J9::RecognizedCallTransformer::process_java_lang_StringCoding_encodeASCII(T
    destinationArrayTreeTop->insertAfter(arrayTranslateTreeTop);
 
    // Now we need to create a store to a temp slot, and then a goto so we can jump over the fallback path
-   TR::SymbolReference *symRefForStore = comp()->getSymRefTab()->createTemporary(comp()->getMethodSymbol(), destinationArrayNode->getDataType(), false, 0);
-   if (destinationArrayNode->getDataType() == TR::Address && destinationArrayNode->isNotCollected())
+   TR::SymbolReference *symRefForStore = comp()->getSymRefTab()->createTemporary(comp()->getMethodSymbol(), TR::Address, false, 0);
+   if ( destinationArrayNode->isNotCollected())
       {
       symRefForStore->getSymbol()->setNotCollected();
       }
-   TR::Node *storeNode = TR::Node::createWithSymRef(node, comp()->il.opCodeForDirectStore(destinationArrayNode->getDataType()), 1, destinationArrayNode, symRefForStore);
+   TR::Node *storeNode = TR::Node::createWithSymRef(node, TR::astore, 1, destinationArrayNode, symRefForStore);
    TR::TreeTop *storeNodeTreeTop = TR::TreeTop::create(comp(), arrayTranslateTreeTop,  storeNode);
 
    // Now create a node to go to the merge block.
@@ -238,12 +386,12 @@ void J9::RecognizedCallTransformer::process_java_lang_StringCoding_encodeASCII(T
 
    TR::TreeTop *newCallNodeTreeTop = TR::TreeTop::create(comp(), TR::Node::create(node, TR::treetop, 1, newCallNode));
    gotoNodeTreeTop->insertAfter(newCallNodeTreeTop);
-   TR::Block *fallbackBranchBlock = forwardBranchBlock->split(newCallNodeTreeTop, cfg, false /* fixUpCommoning */, true /* copyExceptionSuccessors */);
+   TR::Block *fallbackBranchBlock = forwardBranchBlock->split(newCallNodeTreeTop, cfg, false, true);
    fallbackBranchBlock->setIsExtensionOfPreviousBlock(false);
    // Now we have a fallback branch and so set the ifCmpBlock's jump destination to this block!
    ifCmpNode->setBranchDestination(fallbackBranchBlock->getEntry());
    // Now create another store to autoslot node.
-   TR::Node *storeNode2 = TR::Node::createWithSymRef(node, comp()->il.opCodeForDirectStore(newCallNode->getDataType()), 1, newCallNode, symRefForStore);
+   TR::Node *storeNode2 = TR::Node::createWithSymRef(node, TR::astore, 1, newCallNode, symRefForStore);
    TR::TreeTop *storeNodeTreeTop2 = TR::TreeTop::create(comp(), newCallNodeTreeTop ,storeNode2);
 
    // Now we have the fallback block completed as well. Now we should be able to use the original node's block to set the gotoNode's destination, then we just have to recreate the original node
@@ -255,7 +403,9 @@ void J9::RecognizedCallTransformer::process_java_lang_StringCoding_encodeASCII(T
 
    cfg->addEdge(ifCmpBlock, fallbackBranchBlock);
    cfg->addEdge(forwardBranchBlock, mergeBlock);
+   printf("DCDCDCDC -----> Did the transformation!\n");
    }
+*/
 
 void J9::RecognizedCallTransformer::process_java_lang_StringUTF16_toBytes(TR::TreeTop* treetop, TR::Node* node)
    {

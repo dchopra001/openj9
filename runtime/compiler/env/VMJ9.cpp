@@ -2966,6 +2966,11 @@ bool TR_J9VMBase::supressInliningRecognizedInitialCallee(TR_CallSite* callsite, 
                {
                dontInlineRecognizedMethod = true;
                }
+         case TR::java_lang_StringCoding_encodeASCII:
+            if (comp->getOption(TR_EnableInlineEncodeASCII))
+               {
+               dontInlineRecognizedMethod = true;
+               }
          default:
             break;
          }
