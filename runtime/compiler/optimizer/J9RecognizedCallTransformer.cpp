@@ -155,8 +155,29 @@ void J9::RecognizedCallTransformer::process_java_lang_StringCoding_encodeASCII(T
    TR::Node *arraytranslateNode = TR::Node::create(node, TR::arraytranslate, 6);
    arraytranslateNode->setSymbolReference(comp()->getSymRefTab()->findOrCreateArrayTranslateSymbol());
 
-   arraytranslateNode->setAndIncChild(0, sourceArrayNode);
-   arraytranslateNode->setAndIncChild(1, destinationArrayNode);
+//   arraytranslateNode->setAndIncChild(0, sourceArrayNode);
+//   arraytranslateNode->setAndIncChild(1, destinationArrayNode);
+//
+//
+//
+//
+    //arraytranslateNode->setAndIncChild(0, createArrayTopAddressTree(comp(), false, sourceArrayNode));
+    TR::Node *newInputNode = TR::Node::create(sourceArrayNode, comp()->target().is64Bit() ? TR::aladd : TR::aiadd, 2);
+    TR::Node *newInputChild2Node = TR::Node::create(sourceArrayNode, comp()->target().is64Bit() ? TR::lconst : TR::iconst, 0, (int32_t)TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+    newInputNode->setAndIncChild(0, sourceArrayNode);
+    newInputNode->setAndIncChild(1, newInputChild2Node);
+    arraytranslateNode->setAndIncChild(0, newInputNode);
+
+
+
+
+//    arraytranslateNode->setAndIncChild(1, createArrayTopAddressTree(comp(), false, destinationArrayNode));
+   TR::Node *newOutputNode = TR::Node::create(destinationArrayNode, comp()->target().is64Bit() ? TR::aladd : TR::aiadd, 2);
+   TR::Node *newOutputChild2Node = TR::Node::create(destinationArrayNode, comp()->target().is64Bit() ? TR::lconst : TR::iconst, 0, (int32_t)TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+    newOutputNode->setAndIncChild(0, destinationArrayNode);
+    newOutputNode->setAndIncChild(1, newOutputChild2Node);
+    arraytranslateNode->setAndIncChild(1, newOutputNode);
+
 
    uint8_t table[256];
    int i;
@@ -171,7 +192,7 @@ void J9::RecognizedCallTransformer::process_java_lang_StringCoding_encodeASCII(T
    TR::Node *tableNode = createTableLoad(comp(), node, 8, 8, table, false);
    arraytranslateNode->setAndIncChild(2, tableNode);
    arraytranslateNode->setTableBackedByRawStorage(true);
-   arraytranslateNode->setTermCharNodeIsHint(false);
+   arraytranslateNode->setTermCharNodeIsHint(true); // set true here so mask is 1...
    arraytranslateNode->setTargetIsByteArrayTranslate(true);
    arraytranslateNode->setSourceIsByteArrayTranslate(true);
 
@@ -1236,7 +1257,7 @@ bool J9::RecognizedCallTransformer::isInlineable(TR::TreeTop* treetop)
          case TR::java_lang_Long_reverseBytes:
             return comp()->cg()->supportsByteswap();
          case TR::java_lang_StringCoding_encodeASCII:
-            return comp()->target().cpu.isZ();
+            return comp()->cg()->getSupportsArrayTranslateTRxx() && !comp()->getOption(TR_DisableInlineEncodeASCII) && !TR::Compiler->om.canGenerateArraylets();
          default:
             return false;
          }
