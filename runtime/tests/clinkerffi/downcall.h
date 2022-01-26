@@ -36,6 +36,7 @@ typedef int64_t LONG;
 
 typedef struct stru_Bool_Bool stru_Bool_Bool;
 typedef struct stru_Bool_Bool_Bool stru_Bool_Bool_Bool;
+typedef struct stru_20_Bools stru_20_Bools;
 typedef struct stru_NestedStruct_Bool stru_NestedStruct_Bool;
 typedef struct stru_Bool_NestedStruct stru_Bool_NestedStruct;
 typedef struct stru_NestedBoolArray_Bool stru_NestedBoolArray_Bool;
@@ -45,6 +46,7 @@ typedef struct stru_Bool_NestedStruArray stru_Bool_NestedStruArray;
 
 typedef struct stru_Byte_Byte stru_Byte_Byte;
 typedef struct stru_Byte_Byte_Byte stru_Byte_Byte_Byte;
+typedef struct stru_20_Bytes stru_20_Bytes;
 typedef struct stru_NestedStruct_Byte stru_NestedStruct_Byte;
 typedef struct stru_Byte_NestedStruct stru_Byte_NestedStruct;
 typedef struct stru_NestedByteArray_Byte stru_NestedByteArray_Byte;
@@ -55,6 +57,7 @@ typedef struct stru_Byte_Byte_Byte stru_Byte_Byte_Byte;
 
 typedef struct stru_Char_Char stru_Char_Char;
 typedef struct stru_Char_Char_Char stru_Char_Char_Char;
+typedef struct stru_10_Chars stru_10_Chars;
 typedef struct stru_NestedStruct_Char stru_NestedStruct_Char;
 typedef struct stru_Char_NestedStruct stru_Char_NestedStruct;
 typedef struct stru_NestedCharArray_Char stru_NestedCharArray_Char;
@@ -64,6 +67,7 @@ typedef struct stru_Char_NestedStruArray stru_Char_NestedStruArray;
 
 typedef struct stru_Short_Short stru_Short_Short;
 typedef struct stru_Short_Short_Short stru_Short_Short_Short;
+typedef struct stru_10_Shorts stru_10_Shorts;
 typedef struct stru_NestedStruct_Short stru_NestedStruct_Short;
 typedef struct stru_Short_NestedStruct stru_Short_NestedStruct;
 typedef struct stru_NestedShortArray_Short stru_NestedShortArray_Short;
@@ -73,8 +77,7 @@ typedef struct stru_Short_NestedStruArray stru_Short_NestedStruArray;
 
 typedef struct stru_Int_Int stru_Int_Int;
 typedef struct stru_Int_Int_Int stru_Int_Int_Int;
-typedef struct stru_Int_Short stru_Int_Short;
-typedef struct stru_Short_Int stru_Short_Int;
+typedef struct stru_5_Ints stru_5_Ints;
 typedef struct stru_NestedStruct_Int stru_NestedStruct_Int;
 typedef struct stru_Int_NestedStruct stru_Int_NestedStruct;
 typedef struct stru_NestedIntArray_Int stru_NestedIntArray_Int;
@@ -84,8 +87,6 @@ typedef struct stru_Int_NestedStruArray stru_Int_NestedStruArray;
 
 typedef struct stru_Long_Long stru_Long_Long;
 typedef struct stru_Long_Long_Long stru_Long_Long_Long;
-typedef struct stru_Int_Long stru_Int_Long;
-typedef struct stru_Long_Int stru_Long_Int;
 typedef struct stru_NestedStruct_Long stru_NestedStruct_Long;
 typedef struct stru_Long_NestedStruct stru_Long_NestedStruct;
 typedef struct stru_NestedLongArray_Long stru_NestedLongArray_Long;
@@ -95,6 +96,7 @@ typedef struct stru_Long_NestedStruArray stru_Long_NestedStruArray;
 
 typedef struct stru_Float_Float stru_Float_Float;
 typedef struct stru_Float_Float_Float stru_Float_Float_Float;
+typedef struct stru_5_Floats stru_5_Floats;
 typedef struct stru_NestedStruct_Float stru_NestedStruct_Float;
 typedef struct stru_Float_NestedStruct stru_Float_NestedStruct;
 typedef struct stru_NestedFloatArray_Float stru_NestedFloatArray_Float;
@@ -104,16 +106,37 @@ typedef struct stru_Float_NestedStruArray stru_Float_NestedStruArray;
 
 typedef struct stru_Double_Double stru_Double_Double;
 typedef struct stru_Double_Double_Double stru_Double_Double_Double;
-typedef struct stru_Float_Double stru_Float_Double;
-typedef struct stru_Double_Float stru_Double_Float;
-typedef struct stru_Int_Double stru_Int_Double;
-typedef struct stru_Double_Int stru_Double_Int;
 typedef struct stru_NestedStruct_Double stru_NestedStruct_Double;
 typedef struct stru_Double_NestedStruct stru_Double_NestedStruct;
 typedef struct stru_NestedDoubleArray_Double stru_NestedDoubleArray_Double;
 typedef struct stru_Double_NestedDoubleArray stru_Double_NestedDoubleArray;
 typedef struct stru_NestedStruArray_Double stru_NestedStruArray_Double;
 typedef struct stru_Double_NestedStruArray stru_Double_NestedStruArray;
+
+typedef struct stru_Int_Short stru_Int_Short;
+typedef struct stru_Short_Int stru_Short_Int;
+typedef struct stru_Int_Long stru_Int_Long;
+typedef struct stru_Long_Int stru_Long_Int;
+typedef struct stru_Int_Double stru_Int_Double;
+typedef struct stru_Double_Int stru_Double_Int;
+typedef struct stru_Float_Double stru_Float_Double;
+typedef struct stru_Double_Float stru_Double_Float;
+typedef struct stru_Float_Float_Double stru_Float_Float_Double;
+typedef struct stru_Double_Float_Float stru_Double_Float_Float;
+typedef struct stru_Int_Float_Float stru_Int_Float_Float;
+typedef struct stru_Float_Int_Float stru_Float_Int_Float;
+typedef struct stru_Int_Float_Double stru_Int_Float_Double;
+typedef struct stru_Float_Int_Double stru_Float_Int_Double;
+typedef struct stru_Long_Double stru_Long_Double;
+typedef struct stru_Int_3_Floats stru_Int_3_Floats;
+typedef struct stru_Long_2_Floats stru_Long_2_Floats;
+typedef struct stru_3_Floats_Int stru_3_Floats_Int;
+typedef struct stru_Float_Long stru_Float_Long;
+typedef struct stru_Double_Float_Int stru_Double_Float_Int;
+typedef struct stru_Double_Long stru_Double_Long;
+typedef struct stru_Float_Float_Long stru_Float_Float_Long;
+typedef struct stru_3_Shorts_Char stru_3_Shorts_Char;
+typedef struct stru_Int_Float_Int_Float stru_Int_Float_Int_Float;
 
 struct stru_Bool_Bool {
 	bool elem1;
@@ -124,6 +147,29 @@ struct stru_Bool_Bool_Bool {
 	bool elem1;
 	bool elem2;
 	bool elem3;
+};
+
+struct stru_20_Bools {
+	bool elem1;
+	bool elem2;
+	bool elem3;
+	bool elem4;
+	bool elem5;
+	bool elem6;
+	bool elem7;
+	bool elem8;
+	bool elem9;
+	bool elem10;
+	bool elem11;
+	bool elem12;
+	bool elem13;
+	bool elem14;
+	bool elem15;
+	bool elem16;
+	bool elem17;
+	bool elem18;
+	bool elem19;
+	bool elem20;
 };
 
 struct stru_NestedStruct_Bool {
@@ -167,6 +213,29 @@ struct stru_Byte_Byte_Byte {
 	char elem3;
 };
 
+struct stru_20_Bytes {
+	char elem1;
+	char elem2;
+	char elem3;
+	char elem4;
+	char elem5;
+	char elem6;
+	char elem7;
+	char elem8;
+	char elem9;
+	char elem10;
+	char elem11;
+	char elem12;
+	char elem13;
+	char elem14;
+	char elem15;
+	char elem16;
+	char elem17;
+	char elem18;
+	char elem19;
+	char elem20;
+};
+
 struct stru_NestedStruct_Byte {
 	stru_Byte_Byte elem1;
 	char elem2;
@@ -206,6 +275,19 @@ struct stru_Char_Char_Char {
 	short elem1;
 	short elem2;
 	short elem3;
+};
+
+struct stru_10_Chars {
+	short elem1;
+	short elem2;
+	short elem3;
+	short elem4;
+	short elem5;
+	short elem6;
+	short elem7;
+	short elem8;
+	short elem9;
+	short elem10;
 };
 
 struct stru_NestedStruct_Char {
@@ -249,6 +331,19 @@ struct stru_Short_Short_Short {
 	short elem3;
 };
 
+struct stru_10_Shorts {
+	short elem1;
+	short elem2;
+	short elem3;
+	short elem4;
+	short elem5;
+	short elem6;
+	short elem7;
+	short elem8;
+	short elem9;
+	short elem10;
+};
+
 struct stru_NestedStruct_Short {
 	stru_Short_Short elem1;
 	short elem2;
@@ -290,14 +385,12 @@ struct stru_Int_Int_Int {
 	int elem3;
 };
 
-struct stru_Int_Short {
+struct stru_5_Ints {
 	int elem1;
-	short elem2;
-};
-
-struct stru_Short_Int {
-	short elem1;
 	int elem2;
+	int elem3;
+	int elem4;
+	int elem5;
 };
 
 struct stru_NestedStruct_Int {
@@ -341,16 +434,6 @@ struct stru_Long_Long_Long {
 	LONG elem3;
 };
 
-struct stru_Int_Long {
-	int elem1;
-	LONG elem2;
-};
-
-struct stru_Long_Int {
-	LONG elem1;
-	int elem2;
-};
-
 struct stru_NestedStruct_Long {
 	stru_Long_Long elem1;
 	LONG elem2;
@@ -390,6 +473,14 @@ struct stru_Float_Float_Float {
 	float elem1;
 	float elem2;
 	float elem3;
+};
+
+struct stru_5_Floats {
+	float elem1;
+	float elem2;
+	float elem3;
+	float elem4;
+	float elem5;
 };
 
 struct stru_NestedStruct_Float {
@@ -433,26 +524,6 @@ struct stru_Double_Double_Double {
 	double elem3;
 };
 
-struct stru_Float_Double {
-	float elem1;
-	double elem2;
-};
-
-struct stru_Int_Double {
-	int elem1;
-	double elem2;
-};
-
-struct stru_Double_Float {
-	double elem1;
-	float elem2;
-};
-
-struct stru_Double_Int {
-	double elem1;
-	int elem2;
-};
-
 struct stru_NestedStruct_Double {
 	stru_Double_Double elem1;
 	double elem2;
@@ -481,4 +552,139 @@ struct stru_NestedStruArray_Double {
 struct stru_Double_NestedStruArray {
 	double elem1;
 	stru_Double_Double elem2[2];
+};
+
+struct stru_Int_Short {
+	int elem1;
+	short elem2;
+};
+
+struct stru_Short_Int {
+	short elem1;
+	int elem2;
+};
+
+struct stru_Int_Long {
+	int elem1;
+	LONG elem2;
+};
+
+struct stru_Long_Int {
+	LONG elem1;
+	int elem2;
+};
+
+struct stru_Int_Double {
+	int elem1;
+	double elem2;
+};
+
+struct stru_Double_Int {
+	double elem1;
+	int elem2;
+};
+
+struct stru_Float_Double {
+	float elem1;
+	double elem2;
+};
+
+struct stru_Double_Float {
+	double elem1;
+	float elem2;
+};
+
+struct stru_Float_Float_Double {
+	float elem1;
+	float elem2;
+	double elem3;
+};
+
+struct stru_Double_Float_Float {
+	double elem1;
+	float elem2;
+	float elem3;
+};
+
+struct stru_Int_Float_Float {
+	int elem1;
+	float elem2;
+	float elem3;
+};
+
+struct stru_Float_Int_Float {
+	float elem1;
+	int elem2;
+	float elem3;
+};
+
+struct stru_Int_Float_Double {
+	int elem1;
+	float elem2;
+	double elem3;
+};
+
+struct stru_Float_Int_Double {
+	float elem1;
+	int elem2;
+	double elem3;
+};
+
+struct stru_Long_Double {
+	LONG elem1;
+	double elem2;
+};
+
+struct stru_Int_3_Floats {
+	int elem1;
+	float elem2;
+	float elem3;
+	float elem4;
+};
+
+struct stru_Long_2_Floats {
+	long elem1;
+	float elem2;
+	float elem3;
+};
+
+struct stru_3_Floats_Int {
+	float elem1;
+	float elem2;
+	float elem3;
+	int elem4;
+};
+
+struct stru_Float_Long {
+	float elem1;
+	LONG elem2;
+};
+
+struct stru_Double_Float_Int {
+	double elem1;
+	float elem2;
+	int elem3;
+};
+
+struct stru_Double_Long {
+	double elem1;
+	LONG elem2;
+};
+
+struct stru_Float_Float_Long {
+	float elem1;
+	float elem2;
+	LONG elem3;
+};
+
+struct stru_3_Shorts_Char {
+	short elem1[3];
+	short elem2; // intended for the char type in java
+};
+
+struct stru_Int_Float_Int_Float {
+	int elem1;
+	float elem2;
+	int elem3;
+	float elem4;
 };

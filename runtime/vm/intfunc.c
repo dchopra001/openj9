@@ -411,7 +411,20 @@ J9InternalVMFunctions J9InternalFunctions = {
 	runDelayedLockRelatedOperations,
 #endif /* defined(J9VM_OPT_CRIU_SUPPORT) */
 	getClassNameString,
+<<<<<<< HEAD
 #if defined(J9VM_OPT_VALHALLA_VALUE_TYPES)
 	getDefaultValueSlotAddress,
 #endif /* defined(J9VM_OPT_CRIU_SUPPORT) */
+#if JAVA_SPEC_VERSION >= 16
+	createUpcallThunk,
+	getArgPointer,
+	allocateUpcallThunkMemory,
+	doneUpcallThunkGeneration,
+	icallVMprJavaUpcall0,
+	icallVMprJavaUpcall1,
+	icallVMprJavaUpcallJ,
+	icallVMprJavaUpcallF,
+	icallVMprJavaUpcallD,
+	icallVMprJavaUpcallStruct,
+#endif /* JAVA_SPEC_VERSION >= 16 */
 };

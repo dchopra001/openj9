@@ -33,7 +33,7 @@ import jdk.incubator.foreign.SymbolLookup;
 import static jdk.incubator.foreign.ValueLayout.*;
 
 /**
- * Test cases for JEP 419: Foreign Linker API (Second Incubator) DownCall for primitive types,
+ * Test cases for JEP 419: Foreign Linker API (Second Incubator) for primitive types in downcall,
  * which verifies multiple downcalls combined with the diffrent layouts/arguments/return types in multithreading.
  */
 @Test(groups = { "level.sanity" })

@@ -1584,14 +1584,17 @@ exit:
 
 #if JAVA_SPEC_VERSION >= 16
 	/**
-	 * @brief Converts the type of the return value to the return type intended for JEP389/419 FFI downcall/upcall
+	 * @brief Converts the type of the return value to the return type intended for JEP389/419 FFI downcall
+	 *
 	 * @param currentThread[in] The pointer to the current J9VMThread
 	 * @param returnType[in] The type of the return value
 	 * @param returnStorage[in] The pointer to the return value
+	 * @param isDownCall[in] A flag indicating whether the current invocation is returned from the downcall
 	 */
 	static VMINLINE void
 	convertFFIReturnValue(J9VMThread* currentThread, U_8 returnType, UDATA returnTypeSize, UDATA* returnStorage)
 	{
+		printf("\nconvertFFIReturnValue_0: *returnStorage = 0x%lx, returnTypeSize = %ld", *returnStorage, returnTypeSize);
 		switch (returnType) {
 		case J9NtcVoid:
 			currentThread->returnValue = (UDATA)0;
@@ -1638,6 +1641,7 @@ exit:
 		case J9NtcPointer:
 			break;
 		}
+		printf("\nconvertFFIReturnValue_1: returnValue = 0x%lx\n", currentThread->returnValue);
 	}
 #endif /* JAVA_SPEC_VERSION >= 16 */
 

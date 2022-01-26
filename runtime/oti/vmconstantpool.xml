@@ -143,7 +143,17 @@ SPDX-License-Identifier: EPL-2.0 OR Apache-2.0 OR GPL-2.0 WITH Classpath-excepti
 	<classref name="jdk/internal/loader/NativeLibraries" versions="15-"/>
 	<classref name="jdk/internal/loader/NativeLibraries$NativeLibraryImpl" versions="15-"/>
 
+	<!-- Class references needed to support Foreign Linker API. -->
 	<classref name="jdk/internal/foreign/abi/ProgrammableInvoker" flags="opt_openjdkFfi" versions="16-"/>
+	<classref name="jdk/internal/foreign/abi/ProgrammableUpcallHandler" flags="opt_openjdkFfi" versions="16-"/>
+	<classref name="jdk/internal/foreign/abi/UpcallMHMetaData" flags="opt_openjdkFfi" versions="16-"/>
+
+	<classref name="jdk/incubator/foreign/MemoryAddress" flags="opt_openjdkFfi" versions="16-"/>
+	<classref name="jdk/incubator/foreign/MemorySegment" flags="opt_openjdkFfi" versions="16-"/>
+	<classref name="jdk/internal/foreign/MemoryAddressImpl" flags="opt_openjdkFfi" versions="16-"/>
+	<classref name="jdk/internal/foreign/AbstractMemorySegmentImpl" flags="opt_openjdkFfi" versions="16-"/>
+	<classref name="jdk/internal/foreign/NativeMemorySegmentImpl" flags="opt_openjdkFfi" versions="16-"/>
+	<classref name="jdk/internal/foreign/ConfinedScope" flags="opt_openjdkFfi" versions="16-"/>
 
 	<classref name="java/lang/invoke/MethodHandleNatives" flags="opt_openjdkMethodhandle" versions="18-"/>
 
@@ -382,8 +392,22 @@ SPDX-License-Identifier: EPL-2.0 OR Apache-2.0 OR GPL-2.0 WITH Classpath-excepti
 
 	<fieldref class="jdk/internal/loader/NativeLibraries$NativeLibraryImpl" name="fromClass" signature="Ljava/lang/Class;" versions="15-"/>
 
+	<!-- Field references needed to support Foreign Linker API. -->
 	<fieldref class="jdk/internal/foreign/abi/ProgrammableInvoker" name="cifNativeThunkAddr" signature="J" flags="opt_openjdkFfi" versions="16-"/>
 	<fieldref class="jdk/internal/foreign/abi/ProgrammableInvoker" name="argTypesAddr" signature="J" flags="opt_openjdkFfi" versions="16-"/>
+
+	<fieldref class="jdk/internal/foreign/abi/UpcallMHMetaData" name="calleeMH" signature="Ljava/lang/invoke/MethodHandle;" flags="opt_openjdkFfi" versions="16-"/>
+	<fieldref class="jdk/internal/foreign/abi/UpcallMHMetaData" name="calleeType" signature="Ljava/lang/invoke/MethodType;" flags="opt_openjdkFfi" versions="16-"/>
+	<fieldref class="jdk/internal/foreign/abi/UpcallMHMetaData" name="invokeCache" signature="[Ljava/lang/Object;" flags="opt_openjdkFfi" versions="16-"/>
+
+	<fieldref class="jdk/internal/foreign/MemoryAddressImpl" name="segment" signature="Ljdk/internal/foreign/AbstractMemorySegmentImpl;" flags="opt_openjdkFfi" versions="16-17"/>
+	<fieldref class="jdk/internal/foreign/MemoryAddressImpl" name="offset" signature="J" flags="opt_openjdkFfi" versions="16-"/>
+
+	<fieldref class="jdk/internal/foreign/NativeMemorySegmentImpl" name="min" signature="J" flags="opt_openjdkFfi" versions="16-"/>
+	<fieldref class="jdk/internal/foreign/NativeMemorySegmentImpl" name="length" signature="J" flags="opt_openjdkFfi" versions="16-"/>
+	<fieldref class="jdk/internal/foreign/NativeMemorySegmentImpl" name="scope" signature="Ljdk/internal/foreign/ResourceScopeImpl;" flags="opt_openjdkFfi" versions="16-"/>
+
+	<fieldref class="jdk/internal/foreign/ConfinedScope" name="owner" signature="Ljava/lang/Thread;" flags="opt_openjdkFfi" versions="16-"/>
 
 <!--
 	NOTE: the resolution code in jclcinit.c only looks at the J9ROMClassRef->runtimeFlags to determine
@@ -423,6 +447,7 @@ SPDX-License-Identifier: EPL-2.0 OR Apache-2.0 OR GPL-2.0 WITH Classpath-excepti
 
 	<!-- Static method references needed to support OpenJDK MethodHandles. -->
 	<staticmethodref class="java/lang/invoke/MethodHandleResolver" name="linkCallerMethod" signature="(Ljava/lang/Class;ILjava/lang/Class;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;" flags="opt_openjdkMethodhandle"/>
+	<staticmethodref class="java/lang/invoke/MethodHandleResolver" name="upcallLinkCallerMethod" signature="(Ljava/lang/Class;Ljava/lang/invoke/MethodType;)Ljava/lang/Object;" flags="opt_openjdkFfi" versions="16-"/>
 
 	<staticmethodref class="jdk/internal/loader/NativeLibraries" name="load" signature="(Ljdk/internal/loader/NativeLibraries$NativeLibraryImpl;Ljava/lang/String;ZZZ)Z" versions="15-18"/>
 	<staticmethodref class="jdk/internal/loader/NativeLibraries" name="load" signature="(Ljdk/internal/loader/NativeLibraries$NativeLibraryImpl;Ljava/lang/String;ZZ)Z" versions="19-"/>

@@ -32,8 +32,6 @@ import org.testng.AssertJUnit;
 import java.lang.invoke.MethodHandle;
 import jdk.incubator.foreign.CLinker;
 import jdk.incubator.foreign.FunctionDescriptor;
-import jdk.incubator.foreign.MemoryAddress;
-import jdk.incubator.foreign.MemoryLayout;
 import jdk.incubator.foreign.MemorySegment;
 import jdk.incubator.foreign.NativeSymbol;
 import jdk.incubator.foreign.ResourceScope;
@@ -43,12 +41,17 @@ import jdk.incubator.foreign.VaList;
 import static jdk.incubator.foreign.ValueLayout.*;
 import static jdk.incubator.foreign.VaList.Builder;
 
+import org.openj9.test.jep419.upcall.UpcallMethodHandles;
+import static org.openj9.test.jep419.upcall.UpcallMethodHandles.*;
+
 /**
- * Test cases for JEP 419: Foreign Linker API (Second Incubator) for the vararg list in downcall.
+ * Test cases for JEP 419: Foreign Linker API (Second Incubator) for the vararg list in downcall & upcall.
  */
 @Test(groups = { "level.sanity" })
 public class VaListTests {
-	private static boolean isWinOS = System.getProperty("os.name").toLowerCase().contains("win");
+	private static String osName = System.getProperty("os.name").toLowerCase();
+	private static boolean isAixOS = osName.contains("aix");
+	private static boolean isWinOS = osName.contains("win");
 	private static CLinker clinker = CLinker.systemCLinker();
 
 	static {
@@ -60,13 +63,13 @@ public class VaListTests {
 	public void test_addIntsWithVaList() throws Throwable {
 		NativeSymbol functionSymbol = nativeLibLookup.lookup("addIntsFromVaList").get();
 		FunctionDescriptor fd = FunctionDescriptor.of(JAVA_INT, JAVA_INT, ADDRESS);
+		MethodHandle mh = clinker.downcallHandle(functionSymbol, fd);
 
 		try (ResourceScope scope = ResourceScope.newConfinedScope()) {
 			VaList vaList = VaList.make(vaListBuilder -> vaListBuilder.addVarg(JAVA_INT, 700)
 					.addVarg(JAVA_INT, 800)
 					.addVarg(JAVA_INT, 900)
 					.addVarg(JAVA_INT, 1000), scope);
-			MethodHandle mh = clinker.downcallHandle(functionSymbol, fd);
 			int result = (int)mh.invoke(4, vaList);
 			Assert.assertEquals(result, 3400);
 		}
@@ -76,13 +79,13 @@ public class VaListTests {
 	public void test_addLongsWithVaList() throws Throwable {
 		NativeSymbol functionSymbol = nativeLibLookup.lookup("addLongsFromVaList").get();
 		FunctionDescriptor fd = FunctionDescriptor.of(JAVA_LONG, JAVA_INT, ADDRESS);
+		MethodHandle mh = clinker.downcallHandle(functionSymbol, fd);
 
 		try (ResourceScope scope = ResourceScope.newConfinedScope()) {
 			VaList vaList = VaList.make(vaListBuilder -> vaListBuilder.addVarg(JAVA_LONG, 700000L)
 					.addVarg(JAVA_LONG, 800000L)
 					.addVarg(JAVA_LONG, 900000L)
 					.addVarg(JAVA_LONG, 1000000L), scope);
-			MethodHandle mh = clinker.downcallHandle(functionSymbol, fd);
 			long result = (long)mh.invoke(4, vaList);
 			Assert.assertEquals(result, 3400000L);
 		}
@@ -92,13 +95,13 @@ public class VaListTests {
 	public void test_addDoublesWithVaList() throws Throwable {
 		NativeSymbol functionSymbol = nativeLibLookup.lookup("addDoublesFromVaList").get();
 		FunctionDescriptor fd = FunctionDescriptor.of(JAVA_DOUBLE, JAVA_INT, ADDRESS);
+		MethodHandle mh = clinker.downcallHandle(functionSymbol, fd);
 
 		try (ResourceScope scope = ResourceScope.newConfinedScope()) {
 			VaList vaList = VaList.make(vaListBuilder -> vaListBuilder.addVarg(JAVA_DOUBLE, 150.1001D)
 					.addVarg(JAVA_DOUBLE, 160.2002D)
 					.addVarg(JAVA_DOUBLE, 170.1001D)
 					.addVarg(JAVA_DOUBLE, 180.2002D), scope);
-			MethodHandle mh = clinker.downcallHandle(functionSymbol, fd);
 			double result = (double)mh.invoke(4, vaList);
 			Assert.assertEquals(result, 660.6006D);
 		}
@@ -106,13 +109,15 @@ public class VaListTests {
 
 	@Test
 	public void test_vprintfFromDefaultLibWithVaList() throws Throwable {
-		/* Disable the test on Windows given a misaligned access exception coming from
+		/* 1) Disable the test on Windows given a misaligned access exception coming from
 		 * java.base/java.lang.invoke.MemoryAccessVarHandleBase triggered by CLinker.toCString()
 		 * is also captured on OpenJDK/Hotspot.
+		 * 2) Disable the test on AIX as Valist is not yet implemented in OpenJDK.
 		 */
-		if (!isWinOS) {
+		if (!isWinOS && !isAixOS) {
 			NativeSymbol functionSymbol = clinker.lookup("vprintf").get();
 			FunctionDescriptor fd = FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS);
+			MethodHandle mh = clinker.downcallHandle(functionSymbol, fd);
 
 			try (ResourceScope scope = ResourceScope.newConfinedScope()) {
 				SegmentAllocator nativeAllocator = SegmentAllocator.nativeAllocator(scope);
@@ -120,9 +125,65 @@ public class VaListTests {
 				VaList vaList = VaList.make(vaListBuilder -> vaListBuilder.addVarg(JAVA_INT, 7)
 						.addVarg(JAVA_INT, 8)
 						.addVarg(JAVA_INT, 56), scope);
-				MethodHandle mh = clinker.downcallHandle(functionSymbol, fd);
 				mh.invoke(formatSegmt, vaList);
 			}
+		}
+	}
+
+	@Test
+	public void test_addIntsWithVaListByUpcallMH() throws Throwable {
+		FunctionDescriptor fd = FunctionDescriptor.of(JAVA_INT, JAVA_INT, ADDRESS, ADDRESS);
+		NativeSymbol functionSymbol = nativeLibLookup.lookup("addIntsFromVaListByUpcallMH").get();
+		MethodHandle mh = clinker.downcallHandle(functionSymbol, fd);
+
+		try (ResourceScope scope = ResourceScope.newConfinedScope()) {
+			VaList vaList = VaList.make(vaListBuilder -> vaListBuilder.addVarg(JAVA_INT, 700)
+					.addVarg(JAVA_INT, 800)
+					.addVarg(JAVA_INT, 900)
+					.addVarg(JAVA_INT, 1000), scope);
+			NativeSymbol upcallFuncAddr = clinker.upcallStub(UpcallMethodHandles.MH_addIntsFromVaList,
+					FunctionDescriptor.of(JAVA_INT, JAVA_INT, ADDRESS), scope);
+
+			int result = (int)mh.invoke(4, vaList, upcallFuncAddr);
+			Assert.assertEquals(result, 3400);
+		}
+	}
+
+	@Test
+	public void test_addLongsFromVaListByUpcallMH() throws Throwable {
+		FunctionDescriptor fd = FunctionDescriptor.of(JAVA_LONG, JAVA_INT, ADDRESS, ADDRESS);
+		NativeSymbol functionSymbol = nativeLibLookup.lookup("addLongsFromVaListByUpcallMH").get();
+		MethodHandle mh = clinker.downcallHandle(functionSymbol, fd);
+
+		try (ResourceScope scope = ResourceScope.newConfinedScope()) {
+			VaList vaList = VaList.make(vaListBuilder -> vaListBuilder.addVarg(JAVA_LONG, 700000L)
+					.addVarg(JAVA_LONG, 800000L)
+					.addVarg(JAVA_LONG, 900000L)
+					.addVarg(JAVA_LONG, 1000000L), scope);
+			NativeSymbol upcallFuncAddr = clinker.upcallStub(UpcallMethodHandles.MH_addLongsFromVaList,
+					FunctionDescriptor.of(JAVA_LONG, JAVA_INT, ADDRESS), scope);
+
+			long result = (long)mh.invoke(4, vaList, upcallFuncAddr);
+			Assert.assertEquals(result, 3400000L);
+		}
+	}
+
+	@Test
+	public void test_addDoublesFromVaListByUpcallMH() throws Throwable {
+		FunctionDescriptor fd = FunctionDescriptor.of(JAVA_DOUBLE, JAVA_INT, ADDRESS, ADDRESS);
+		NativeSymbol functionSymbol = nativeLibLookup.lookup("addDoublesFromVaListByUpcallMH").get();
+		MethodHandle mh = clinker.downcallHandle(functionSymbol, fd);
+
+		try (ResourceScope scope = ResourceScope.newConfinedScope()) {
+			VaList vaList = VaList.make(vaListBuilder -> vaListBuilder.addVarg(JAVA_DOUBLE, 150.1001D)
+					.addVarg(JAVA_DOUBLE, 160.2002D)
+					.addVarg(JAVA_DOUBLE, 170.1001D)
+					.addVarg(JAVA_DOUBLE, 180.2002D), scope);
+			NativeSymbol upcallFuncAddr = clinker.upcallStub(UpcallMethodHandles.MH_addDoublesFromVaList,
+					FunctionDescriptor.of(JAVA_DOUBLE, JAVA_INT, ADDRESS), scope);
+
+			double result = (double)mh.invoke(4, vaList, upcallFuncAddr);
+			Assert.assertEquals(result, 660.6006D);
 		}
 	}
 }

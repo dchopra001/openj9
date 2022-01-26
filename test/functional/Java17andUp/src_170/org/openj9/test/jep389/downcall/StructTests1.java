@@ -170,7 +170,8 @@ public class StructTests1 {
 	@Test
 	public void test_addBoolAndBoolsFromNestedStructWithXor_1() throws Throwable {
 		GroupLayout nestedStructLayout = MemoryLayout.structLayout(C_CHAR.withName("elem1"), C_CHAR.withName("elem2"));
-		GroupLayout structLayout = MemoryLayout.structLayout(nestedStructLayout.withName("struct_elem1"), C_CHAR.withName("elem2"));
+		GroupLayout structLayout = MemoryLayout.structLayout(nestedStructLayout.withName("struct_elem1"),
+				C_CHAR.withName("elem2"), MemoryLayout.paddingLayout(C_CHAR.bitSize()));
 		MethodType mt = MethodType.methodType(boolean.class, boolean.class, MemorySegment.class);
 		FunctionDescriptor fd = FunctionDescriptor.of(C_CHAR, C_CHAR, structLayout);
 		Addressable functionSymbol = nativeLibLookup.lookup("addBoolAndBoolsFromNestedStructWithXor").get();
@@ -213,7 +214,8 @@ public class StructTests1 {
 	@Test
 	public void test_addBoolAndBoolsFromNestedStructWithXor_withoutLayoutName_1() throws Throwable {
 		GroupLayout nestedStructLayout = MemoryLayout.structLayout(C_CHAR, C_CHAR);
-		GroupLayout structLayout = MemoryLayout.structLayout(nestedStructLayout, C_CHAR);
+		GroupLayout structLayout = MemoryLayout.structLayout(nestedStructLayout, C_CHAR,
+				MemoryLayout.paddingLayout(C_CHAR.bitSize()));
 		MethodType mt = MethodType.methodType(boolean.class, boolean.class, MemorySegment.class);
 		FunctionDescriptor fd = FunctionDescriptor.of(C_CHAR, C_CHAR, structLayout);
 		Addressable functionSymbol = nativeLibLookup.lookup("addBoolAndBoolsFromNestedStructWithXor").get();
@@ -278,7 +280,8 @@ public class StructTests1 {
 	@Test
 	public void test_addBoolAndBoolsFromStructWithNestedBoolArray_withoutLayoutName_1() throws Throwable {
 		SequenceLayout boolArray = MemoryLayout.sequenceLayout(2, C_CHAR);
-		GroupLayout structLayout = MemoryLayout.structLayout(boolArray, C_CHAR);
+		GroupLayout structLayout = MemoryLayout.structLayout(boolArray, C_CHAR,
+				MemoryLayout.paddingLayout(C_CHAR.bitSize()));
 		MethodType mt = MethodType.methodType(boolean.class, boolean.class, MemorySegment.class);
 		FunctionDescriptor fd = FunctionDescriptor.of(C_CHAR, C_CHAR, structLayout);
 		Addressable functionSymbol = nativeLibLookup.lookup("addBoolAndBoolsFromStructWithNestedBoolArray").get();
@@ -350,7 +353,8 @@ public class StructTests1 {
 	public void test_addBoolAndBoolsFromStructWithNestedStructArray_withoutLayoutName_1() throws Throwable {
 		GroupLayout boolStruct = MemoryLayout.structLayout(C_CHAR, C_CHAR);
 		SequenceLayout structArray = MemoryLayout.sequenceLayout(2, boolStruct);
-		GroupLayout structLayout = MemoryLayout.structLayout(structArray, C_CHAR);
+		GroupLayout structLayout = MemoryLayout.structLayout(structArray, C_CHAR,
+				MemoryLayout.paddingLayout(C_CHAR.bitSize() * 3));
 		MethodType mt = MethodType.methodType(boolean.class, boolean.class, MemorySegment.class);
 		FunctionDescriptor fd = FunctionDescriptor.of(C_CHAR, C_CHAR, structLayout);
 		Addressable functionSymbol = nativeLibLookup.lookup("addBoolAndBoolsFromStructWithNestedStructArray").get();
@@ -555,7 +559,8 @@ public class StructTests1 {
 	@Test
 	public void test_addByteAndBytesFromNestedStruct_1() throws Throwable {
 		GroupLayout nestedStructLayout = MemoryLayout.structLayout(C_CHAR.withName("elem1"), C_CHAR.withName("elem2"));
-		GroupLayout structLayout = MemoryLayout.structLayout(nestedStructLayout.withName("struct_elem1"), C_CHAR.withName("elem2"));
+		GroupLayout structLayout = MemoryLayout.structLayout(nestedStructLayout.withName("struct_elem1"),
+				C_CHAR.withName("elem2"), MemoryLayout.paddingLayout(C_CHAR.bitSize()));
 		MethodType mt = MethodType.methodType(byte.class, byte.class, MemorySegment.class);
 		FunctionDescriptor fd = FunctionDescriptor.of(C_CHAR, C_CHAR, structLayout);
 		Addressable functionSymbol = nativeLibLookup.lookup("addByteAndBytesFromNestedStruct").get();
@@ -598,7 +603,8 @@ public class StructTests1 {
 	@Test
 	public void test_addByteAndBytesFromNestedStruct_withoutLayoutName_1() throws Throwable {
 		GroupLayout nestedStructLayout = MemoryLayout.structLayout(C_CHAR, C_CHAR);
-		GroupLayout structLayout = MemoryLayout.structLayout(nestedStructLayout, C_CHAR);
+		GroupLayout structLayout = MemoryLayout.structLayout(nestedStructLayout, C_CHAR,
+				MemoryLayout.paddingLayout(C_CHAR.bitSize()));
 		MethodType mt = MethodType.methodType(byte.class, byte.class, MemorySegment.class);
 		FunctionDescriptor fd = FunctionDescriptor.of(C_CHAR, C_CHAR, structLayout);
 		Addressable functionSymbol = nativeLibLookup.lookup("addByteAndBytesFromNestedStruct").get();
@@ -663,7 +669,8 @@ public class StructTests1 {
 	@Test
 	public void test_addByteAndBytesFromStructWithNestedByteArray_withoutLayoutName_1() throws Throwable {
 		SequenceLayout byteArray = MemoryLayout.sequenceLayout(2, C_CHAR);
-		GroupLayout structLayout = MemoryLayout.structLayout(byteArray, C_CHAR);
+		GroupLayout structLayout = MemoryLayout.structLayout(byteArray, C_CHAR,
+				MemoryLayout.paddingLayout(C_CHAR.bitSize()));
 		MethodType mt = MethodType.methodType(byte.class, byte.class, MemorySegment.class);
 		FunctionDescriptor fd = FunctionDescriptor.of(C_CHAR, C_CHAR, structLayout);
 		Addressable functionSymbol = nativeLibLookup.lookup("addByteAndBytesFromStructWithNestedByteArray").get();
@@ -735,7 +742,8 @@ public class StructTests1 {
 	public void test_addByteAndBytesFromStructWithNestedStructArray_withoutLayoutName_1() throws Throwable {
 		GroupLayout byteStruct = MemoryLayout.structLayout(C_CHAR, C_CHAR);
 		SequenceLayout structArray = MemoryLayout.sequenceLayout(2, byteStruct);
-		GroupLayout structLayout = MemoryLayout.structLayout(structArray, C_CHAR);
+		GroupLayout structLayout = MemoryLayout.structLayout(structArray, C_CHAR,
+				MemoryLayout.paddingLayout(C_CHAR.bitSize() * 3));
 		MethodType mt = MethodType.methodType(byte.class, byte.class, MemorySegment.class);
 		FunctionDescriptor fd = FunctionDescriptor.of(C_CHAR, C_CHAR, structLayout);
 		Addressable functionSymbol = nativeLibLookup.lookup("addByteAndBytesFromStructWithNestedStructArray").get();
@@ -940,7 +948,8 @@ public class StructTests1 {
 	@Test
 	public void test_addCharAndCharsFromNestedStruct_1() throws Throwable {
 		GroupLayout nestedStructLayout = MemoryLayout.structLayout(C_SHORT.withName("elem1"), C_SHORT.withName("elem2"));
-		GroupLayout structLayout = MemoryLayout.structLayout(nestedStructLayout.withName("struct_elem1"), C_SHORT.withName("elem2"));
+		GroupLayout structLayout = MemoryLayout.structLayout(nestedStructLayout.withName("struct_elem1"),
+				C_SHORT.withName("elem2"), MemoryLayout.paddingLayout(C_SHORT.bitSize()));
 		MethodType mt = MethodType.methodType(char.class, char.class, MemorySegment.class);
 		FunctionDescriptor fd = FunctionDescriptor.of(C_SHORT, C_SHORT, structLayout);
 		Addressable functionSymbol = nativeLibLookup.lookup("addCharAndCharsFromNestedStruct").get();
@@ -1174,7 +1183,8 @@ public class StructTests1 {
 
 	@Test
 	public void test_add3CharStructs_returnStruct_1() throws Throwable {
-		GroupLayout structLayout = MemoryLayout.structLayout(C_SHORT.withName("elem1"), C_SHORT.withName("elem2"), C_SHORT.withName("elem3"));
+		GroupLayout structLayout = MemoryLayout.structLayout(C_SHORT.withName("elem1"), C_SHORT.withName("elem2"),
+				C_SHORT.withName("elem3"), MemoryLayout.paddingLayout(C_SHORT.bitSize()));
 		VarHandle charHandle1 = structLayout.varHandle(char.class, PathElement.groupElement("elem1"));
 		VarHandle charHandle2 = structLayout.varHandle(char.class, PathElement.groupElement("elem2"));
 		VarHandle charHandle3 = structLayout.varHandle(char.class, PathElement.groupElement("elem3"));
@@ -1345,7 +1355,8 @@ public class StructTests1 {
 	@Test
 	public void test_addShortAndShortsFromNestedStruct_withoutLayoutName_1() throws Throwable {
 		GroupLayout nestedStructLayout = MemoryLayout.structLayout(C_SHORT, C_SHORT);
-		GroupLayout structLayout = MemoryLayout.structLayout(nestedStructLayout, C_SHORT);
+		GroupLayout structLayout = MemoryLayout.structLayout(nestedStructLayout, C_SHORT,
+				MemoryLayout.paddingLayout(C_SHORT.bitSize()));
 		MethodType mt = MethodType.methodType(short.class, short.class, MemorySegment.class);
 		FunctionDescriptor fd = FunctionDescriptor.of(C_SHORT, C_SHORT, structLayout);
 		Addressable functionSymbol = nativeLibLookup.lookup("addShortAndShortsFromNestedStruct").get();
