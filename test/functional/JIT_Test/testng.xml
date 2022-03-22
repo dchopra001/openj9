@@ -583,7 +583,6 @@
       <class name="jit.test.recognizedMethod.TestJavaLangStringLatin1" />
       <class name="jit.test.recognizedMethod.TestRecognizedCallTransformer" />
       <class name="jit.test.recognizedMethod.TestJavaIntegerAndLongToString" />
-      <class name="jit.test.recognizedMethod.TestJavaLangStringCodingEncodeASCII" />
     </classes>
   </test>
 
