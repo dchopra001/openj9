@@ -6412,10 +6412,12 @@ processCompressionOptions(J9JavaVM *vm)
 	argIndex2 = FIND_AND_CONSUME_ARG(EXACT_MATCH, VMOPT_XXNOCOMPACTSTRINGS, NULL);
 
 	/* Default setting */
-	vm->strCompEnabled = FALSE;
+	vm->strCompEnabled = TRUE;
 
-	if (argIndex1 > argIndex2) {
-		vm->strCompEnabled = TRUE;
+	// Default to enable string compression unless there's the option to disable string compression
+	// is explicitly defined.
+	if (argIndex2 > argIndex1) {
+		vm->strCompEnabled = FALSE;
 	}
 }
 

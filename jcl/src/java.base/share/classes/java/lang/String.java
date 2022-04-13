@@ -3352,9 +3352,16 @@ public final class String implements Serializable, Comparable<String>, CharSeque
 			} else {
 				int rLength = regex.lengthInternal();
 
-				byte[] splitChars = regex.value;
+				byte[] splitChars;
+				// if regex is compressed and this string isn't, decompress regex string
+				if (COMPACT_STRINGS && !compressed && (LATIN1 == regex.coder)) {
+					splitChars = new byte[rLength << 1];
+					decompress(regex.value, 0, splitChars, 0, rLength);
+				} else {
+					splitChars = regex.value;
+				}
 
-				char firstChar = charAtInternal(0, regex.value);
+				char firstChar = charAtInternal(0, splitChars);
 				while (current < end) {
 					if (charAtInternal(current, chars) == firstChar) {
 						int idx = current + 1;
@@ -7740,9 +7747,16 @@ written authorization of the copyright holder.
 			} else {
 				int rLength = regex.lengthInternal();
 
-				char[] splitChars = regex.value;
+				char[] splitChars;
+				// if regex is compressed and this string isn't, decompress regex string
+				if (COMPACT_STRINGS && !compressed && (LATIN1 == regex.coder)) {
+					splitChars = new char[rLength << 1];
+					decompress(regex.value, 0, splitChars, 0, rLength);
+				} else {
+					splitChars = regex.value;
+				}
 
-				char firstChar = charAtInternal(0, regex.value);
+				char firstChar = charAtInternal(0, splitChars);
 				while (current < end) {
 					if (charAtInternal(current, chars) == firstChar) {
 						int idx = current + 1;
