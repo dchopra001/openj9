@@ -1074,7 +1074,7 @@ TR_CISCGraph::initializeGraphs(TR::Compilation *c)
    // relocatable for remote compiles. Thus we disable this option for remote compiles for now.
    bool genDecimal = c->target().cpu.isZ() && !c->isOutOfProcessCompilation();
 #else
-   bool genDecimal = c->target().cpu.isZ();
+   bool genDecimal = c->target().cpu.isZ() && !c->compileRelocatableCode();
 #endif /* defined(J9VM_OPT_JITSERVER) */
    bool genBitOpMem = c->target().cpu.isZ();
    bool is64Bit = c->target().is64Bit();
