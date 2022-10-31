@@ -1072,7 +1072,7 @@ TR_CISCGraph::initializeGraphs(TR::Compilation *c)
 #if defined(J9VM_OPT_JITSERVER)
    // Enabling genDecimal generates the TROT instruction on Z which is currently not
    // relocatable for remote compiles. Thus we disable this option for remote compiles for now.
-   bool genDecimal = c->target().cpu.isZ() && !c->isOutOfProcessCompilation();
+   bool genDecimal = c->target().cpu.isZ() && !c->isOutOfProcessCompilation() && !c->compileRelocatableCode();
 #else
    bool genDecimal = c->target().cpu.isZ() && !c->compileRelocatableCode();
 #endif /* defined(J9VM_OPT_JITSERVER) */
