@@ -1241,10 +1241,10 @@ public final class JITHelpers {
 		try {
 			return ma.invoke(obj, args);
 		} catch (InvocationTargetException e) {
-			if (e.getCause() != null && e.getCause().getClass().getName().equals("java.lang.NullPointerException")) {
-				Class < ? extends Throwable > expected = com.ibm.jit.JITHelpers.getExpectedException();
+			if (e.getCause() != null && e.getCause().getClass().getName().equals("java.lang.NoClassDefFoundError")) {
+				//Class < ? extends Throwable > expected = com.ibm.jit.JITHelpers.getExpectedException();
 				boolean runDebugAgent = true;
-				if (expected != null) {
+				/*if (expected != null) {
 					Throwable targetException = e.getTargetException();
 					if (!expected.isAssignableFrom(targetException.getClass())) {
 						String message = "From JITHelpers.invoke - Unexpected exception, expected<" +
@@ -1254,10 +1254,10 @@ public final class JITHelpers {
 					} else {
 						runDebugAgent = false;
 					}
-				}
+				}*/
 				if (runDebugAgent) {
 					synchronized (JITHelpers.class) {
-						System.err.println("Caught java.lang.NullPointerException inside JITHelpers, thread "+Thread.currentThread().getName());
+						System.err.println("Caught java.lang.NoClassDefFoundError inside JITHelpers, thread "+Thread.currentThread().getName());
 						e.getCause().printStackTrace();
 						debugAgentRun(ma, obj, args);
 				
