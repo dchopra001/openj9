@@ -31,6 +31,12 @@ defineClassCommon(JNIEnv *env, jobject classLoaderObject,
 	jstring className, jbyteArray classRep, jint offset, jint length, jobject protectionDomain, UDATA *options, J9Class *hostClass, J9ClassPatchMap *patchMap, BOOLEAN validateName)
 {
 #ifdef J9VM_OPT_DYNAMIC_LOAD_SUPPORT
+int reason = 0;
+int classLoaderSuccess = 0;
+jboolean isCopy;
+const char* utfClassName1 =  (const char *) (*env)->GetStringUTFChars(env, className, &isCopy);
+//printf("DCDCDCDC--> className: %s, J9VM_OPT_DYNAMIC_LOAD_SUPPORT=true\n", utfClassName1);
+
 
 /* Try a couple of GC passes (1 doesn't sem to be enough), but don't try forever */
 #define MAX_RETRY_COUNT 2 
@@ -113,6 +119,8 @@ defineClassCommon(JNIEnv *env, jobject classLoaderObject,
 			 * is distinguished by returning NULL with no exception pending.
 			 */
 			*options |= J9_FINDCLASS_FLAG_NAME_IS_INVALID;
+			reason |= 0x1;
+			//printf("DCDCDCDC--> className: %s, LN:117\n", utfClassName1);
 		}
 
 		if (J9_ARE_ANY_BITS_SET(*options, J9_FINDCLASS_FLAG_HIDDEN | J9_FINDCLASS_FLAG_UNSAFE)) {
@@ -144,8 +152,10 @@ defineClassCommon(JNIEnv *env, jobject classLoaderObject,
 	classLoader = J9VMJAVALANGCLASSLOADER_VMREF(currentThread, J9_JNI_UNWRAP_REFERENCE(classLoaderObject));
 
 	if (NULL == classLoader) {
+		classLoaderSuccess |= 0x1;
 		classLoader = vmFuncs->internalAllocateClassLoader(vm, J9_JNI_UNWRAP_REFERENCE(classLoaderObject));
 		if (NULL == classLoader) {
+			classLoaderSuccess |= 0x10;
 			goto done;
 		}
 	}
@@ -159,6 +169,8 @@ retry:
 			/* Bad, we have already defined this class - fail */
 			omrthread_monitor_exit(vm->classTableMutex);
 			if (J9_ARE_NO_BITS_SET(*options, J9_FINDCLASS_FLAG_NAME_IS_INVALID)) {
+				reason |= 0x10;
+				//printf("DCDCDCDC--> className: %s, LN:164\n", utfClassName1);
 				vmFuncs->setCurrentExceptionNLSWithArgs(currentThread, J9NLS_JCL_DUPLICATE_CLASS_DEFINITION, J9VMCONSTANTPOOL_JAVALANGLINKAGEERROR, utf8Length, utf8Name);
 			}
 			goto done;
@@ -242,6 +254,8 @@ retry:
 done:
 	if (NULL == clazz) {
 		if (J9_ARE_ANY_BITS_SET(*options, J9_FINDCLASS_FLAG_NAME_IS_INVALID)) {
+			reason |= 0x100;
+			//printf("DCDCDCDC--> className: %s, LN:248\n", utfClassName1);
 			/*
 			 * The caller signalled that the name is invalid. Leave the result NULL and
 			 * clear any pending exception; the caller will throw NoClassDefFoundError.
@@ -253,6 +267,8 @@ done:
 			vmFuncs->setCurrentException(currentThread, J9VMCONSTANTPOOL_JAVALANGCLASSFORMATERROR, NULL);
 		}
 	} else {
+		reason |= 0x1000;
+		//printf("DCDCDCDC--> className: %s, LN:260, setting result\n", utfClassName1);
 		result = vmFuncs->j9jni_createLocalRef(env, J9VM_J9CLASS_TO_HEAPCLASS(clazz));
 	}
 
@@ -265,10 +281,23 @@ done:
 	if (!isContiguousClassBytes) {
 		j9mem_free_memory(classBytes);
 	}
-
+	//if (J9_ARE_ANY_BITS_SET(options, J9_FINDCLASS_FLAG_NAME_IS_INVALID) && (NULL == result) && (NULL == currentThread->currentException))
+	if (J9_ARE_ANY_BITS_SET(*options, J9_FINDCLASS_FLAG_NAME_IS_INVALID) && (NULL == result) && (NULL == currentThread->currentException)) {
+		printf("DCDCDCDC--> className: %s, LN:273, reason: 0x%08x, classLoaderSuccess: 0x%08x\n", utfClassName1, reason, classLoaderSuccess);
+		printf("DCDCDCDC--> className: %s, utf8Length:%d, stringPrint:\n", utfClassName1, (int)utf8Length);
+		for (int i = 0; i < (int)utf8Length; i++)
+			printf("%d,", *(((char *)utf8Name) + i));
+		printf("\n");
+	}
+	(*env)->ReleaseStringUTFChars(env, className, utfClassName1);
 	return result;
 
 #else /* J9VM_OPT_DYNAMIC_LOAD_SUPPORT */
+	jboolean isCopy;
+	const char* utfClassName1 =  (const char *) (*env)->GetStringUTFChars(env, className, &isCopy);
+	printf("DCDCDCDC--> className: %s, J9VM_OPT_DYNAMIC_LOAD_SUPPORT=FALSE\n", utfClassName1);
+	(*env)->ReleaseStringUTFChars(env, className, utfClassName1);
+
 	throwNewInternalError(env, "Dynamic loading not supported");
 	return NULL;
 #endif /* J9VM_OPT_DYNAMIC_LOAD_SUPPORT */
