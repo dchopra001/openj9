@@ -324,8 +324,9 @@ internalFindClassString(J9VMThread* currentThread, j9object_t moduleName, j9obje
 		}
 
 		/* Make sure the name is legal */
+		int verifyQualifiedNameReason = 0;
 		if ((CLASSNAME_INVALID == allowedBitsForClassName)
-			|| (CLASSNAME_INVALID != verifyQualifiedName(currentThread, utf8Name, utf8Length, allowedBitsForClassName))
+			|| (CLASSNAME_INVALID != verifyQualifiedName(currentThread, utf8Name, utf8Length, allowedBitsForClassName, &verifyQualifiedNameReason))
 		) {
 			if (NULL != moduleName) {
 				J9Module module = {0};

@@ -2571,8 +2571,8 @@ jvmDefineClassHelper(JNIEnv *env, jobject classLoaderObject,
 			vmFuncs->setNativeOutOfMemoryError(currentThread, 0, 0);
 			goto done;
 		}
-
-		if (CLASSNAME_INVALID == vmFuncs->verifyQualifiedName(currentThread, utf8Name, utf8Length, CLASSNAME_VALID_NON_ARRARY)) {
+		int verifyQualifiedNameReason = 0;
+		if (CLASSNAME_INVALID == vmFuncs->verifyQualifiedName(currentThread, utf8Name, utf8Length, CLASSNAME_VALID_NON_ARRARY, &verifyQualifiedNameReason)) {
 			vmFuncs->setCurrentException(currentThread, J9VMCONSTANTPOOL_JAVALANGNOCLASSDEFFOUNDERROR, (UDATA *)*(j9object_t*)className);
 			goto done;
 		}

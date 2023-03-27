@@ -371,13 +371,14 @@ getStringUTF8Length(J9VMThread *vmThread, j9object_t string)
 }
 
 UDATA 
-verifyQualifiedName(J9VMThread *vmThread, U_8 *className, UDATA classNameLength, UDATA allowedBitsForClassName)
+verifyQualifiedName(J9VMThread *vmThread, U_8 *className, UDATA classNameLength, UDATA allowedBitsForClassName, int* verifyQualifiedNameReason)
 {
 	UDATA result = CLASSNAME_INVALID;
 	UDATA remainingLength = classNameLength;
 	BOOLEAN separator = FALSE;
 	UDATA arity = 0;
 	UDATA i = 0;
+	static int printCounter = 0;
 
 	/* strip leading ['s for array classes */
 	for (i = 0; i < classNameLength; i++) {
@@ -391,6 +392,7 @@ verifyQualifiedName(J9VMThread *vmThread, U_8 *className, UDATA classNameLength,
 
 	if (0 == remainingLength) {
 		/* Name must be more than just [s.  Also catches empty string case */
+		*verifyQualifiedNameReason |= 0x1;
 		return CLASSNAME_INVALID;
 	}
 
@@ -400,6 +402,7 @@ verifyQualifiedName(J9VMThread *vmThread, U_8 *className, UDATA classNameLength,
 		switch (className[i]) {
 		case '.':
 			if (separator) {
+				*verifyQualifiedNameReason |= 0x10;
 				return CLASSNAME_INVALID;
 			}
 			/* convert the characters from '.' to '/' in the case of J9_STR_XLAT for later use in the caller */
@@ -407,18 +410,21 @@ verifyQualifiedName(J9VMThread *vmThread, U_8 *className, UDATA classNameLength,
 			separator = TRUE;
 			break;
 		case '/':
+			*verifyQualifiedNameReason |= 0x100;
 			return CLASSNAME_INVALID;
 		case ';':
 			/* Valid at the end of array classes */
 			if (arity && (1 == remainingLength)) {
 				break;
 			}
+			*verifyQualifiedNameReason |= 0x1000;
 			return CLASSNAME_INVALID;
 		case '<': /* Fall through */
 		case '>':
 			separator = FALSE; /* allow /<>/ as a pattern, per test suites */
 			break;
 		case '[':
+			*verifyQualifiedNameReason |= 0x10000;
 			return CLASSNAME_INVALID;
 		default:
 			/* Do Nothing */
@@ -430,6 +436,7 @@ verifyQualifiedName(J9VMThread *vmThread, U_8 *className, UDATA classNameLength,
 
 	/* the separator shouldn't exist at the end of name, regardless of class and method */
 	if (separator) {
+		*verifyQualifiedNameReason |= 0x100000;
 		return CLASSNAME_INVALID;
 	}
 
@@ -438,9 +445,16 @@ verifyQualifiedName(J9VMThread *vmThread, U_8 *className, UDATA classNameLength,
 	 */
 	result = (0 == arity) ? CLASSNAME_VALID_NON_ARRARY : CLASSNAME_VALID_ARRARY;
 	if (J9_ARE_ANY_BITS_SET(result, allowedBitsForClassName)) {
+		if (printCounter % 100 == 0)
+		{
+			/*printf("DCDCDCDC --> PrintingClassName\n");
+			for (int i = 0; i < (int)classNameLength; i++)
+			   printf("%d,", *(((char *)className) + i));
+		    printf("\n");*/
+		}
 		return result;
 	}
-
+	*verifyQualifiedNameReason |= 0x1000000;
 	return CLASSNAME_INVALID;
 }
 

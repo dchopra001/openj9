@@ -3475,7 +3475,7 @@ getStringUTF8Length(J9VMThread *vmThread,j9object_t string);
 * @return a UDATA to indicate the nature of incoming class name string, see descriptions above.
 */
 UDATA
-verifyQualifiedName(J9VMThread *vmThread, U_8 *className, UDATA classNameLength, UDATA allowedBitsForClassName);
+verifyQualifiedName(J9VMThread *vmThread, U_8 *className, UDATA classNameLength, UDATA allowedBitsForClassName, int* verifyQualifiedNameReason);
 
 
 /* ---------------- swalk.c ---------------- */
