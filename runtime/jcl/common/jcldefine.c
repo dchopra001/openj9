@@ -150,10 +150,11 @@ const char* utfClassName1 =  (const char *) (*env)->GetStringUTFChars(env, class
 	}
 
 	classLoader = J9VMJAVALANGCLASSLOADER_VMREF(currentThread, J9_JNI_UNWRAP_REFERENCE(classLoaderObject));
+	int internalAllocateClassLoaderResult = 0;
 
 	if (NULL == classLoader) {
 		classLoaderSuccess |= 0x1;
-		classLoader = vmFuncs->internalAllocateClassLoader(vm, J9_JNI_UNWRAP_REFERENCE(classLoaderObject));
+		classLoader = vmFuncs->internalAllocateClassLoader(vm, J9_JNI_UNWRAP_REFERENCE(classLoaderObject), &internalAllocateClassLoaderResult);
 		if (NULL == classLoader) {
 			classLoaderSuccess |= 0x10;
 			goto done;
@@ -283,7 +284,7 @@ done:
 	}
 	//if (J9_ARE_ANY_BITS_SET(options, J9_FINDCLASS_FLAG_NAME_IS_INVALID) && (NULL == result) && (NULL == currentThread->currentException))
 	if (J9_ARE_ANY_BITS_SET(*options, J9_FINDCLASS_FLAG_NAME_IS_INVALID) && (NULL == result) && (NULL == currentThread->currentException)) {
-		printf("DCDCDCDC--> className: %s, LN:273, reason: 0x%08x, classLoaderSuccess: 0x%08x\n", utfClassName1, reason, classLoaderSuccess);
+		printf("DCDCDCDC--> className: %s, LN:273, reason: 0x%08x, classLoaderSuccess: 0x%08x, internalAllocateClassLoaderResult: 0x%08x\n", utfClassName1, reason, classLoaderSuccess, internalAllocateClassLoaderResult);
 		printf("DCDCDCDC--> className: %s, utf8Length:%d, stringPrint:\n", utfClassName1, (int)utf8Length);
 		for (int i = 0; i < (int)utf8Length; i++)
 			printf("%d,", *(((char *)utf8Name) + i));

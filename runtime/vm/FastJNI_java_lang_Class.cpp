@@ -80,7 +80,7 @@ Fast_java_lang_Class_forNameImpl(J9VMThread *currentThread, j9object_t className
 		classLoader = J9VMJAVALANGCLASSLOADER_VMREF(currentThread, classLoaderObject);
 		if (NULL == classLoader) {
 			PUSH_OBJECT_IN_SPECIAL_FRAME(currentThread, classNameObject);
-			classLoader = internalAllocateClassLoader(vm, classLoaderObject);
+			classLoader = internalAllocateClassLoader(vm, classLoaderObject, 0);
 			classNameObject = POP_OBJECT_IN_SPECIAL_FRAME(currentThread);
 			if (NULL == classLoader) {
 				goto done;

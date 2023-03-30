@@ -1016,7 +1016,7 @@ Java_com_ibm_oti_shared_SharedClassAbstractHelper_initializeShareableClassloader
 	nativeClassloader = J9VMJAVALANGCLASSLOADER_VMREF((J9VMThread *)env, J9_JNI_UNWRAP_REFERENCE(classloader));
 
 	if (NULL == nativeClassloader) {
-		nativeClassloader = vm->internalVMFunctions->internalAllocateClassLoader(vm, J9_JNI_UNWRAP_REFERENCE(classloader));
+		nativeClassloader = vm->internalVMFunctions->internalAllocateClassLoader(vm, J9_JNI_UNWRAP_REFERENCE(classloader), 0);
 		if (NULL == nativeClassloader) {
 			vm->internalVMFunctions->internalExitVMToJNI((J9VMThread *)env);
 			return 0;

@@ -2601,7 +2601,7 @@ defineClass(JNIEnv *env, const char *name, jobject loader, const jbyte *buf, jsi
 
 			classLoader = J9VMJAVALANGCLASSLOADER_VMREF(currentThread, loaderObject);
 			if (NULL == classLoader) {
-			  classLoader = internalAllocateClassLoader(vm, loaderObject);
+			  classLoader = internalAllocateClassLoader(vm, loaderObject, 0);
 			  if (NULL == classLoader) {
 				  goto done;
 			  }

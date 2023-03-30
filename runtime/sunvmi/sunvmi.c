@@ -1064,7 +1064,7 @@ internalFindClassFromClassLoader(JNIEnv* env, char* className, jboolean init, jo
 	} else {
 		loader = J9VMJAVALANGCLASSLOADER_VMREF(currentThread, J9_JNI_UNWRAP_REFERENCE(classLoader));
 		if (NULL == loader) {
-			loader = vmFuncs->internalAllocateClassLoader(vm, J9_JNI_UNWRAP_REFERENCE(classLoader));
+			loader = vmFuncs->internalAllocateClassLoader(vm, J9_JNI_UNWRAP_REFERENCE(classLoader), 0);
 			if (NULL == loader) {
 				vmFuncs->internalExitVMToJNI((J9VMThread *)env);
 				if (throwError == JNI_FALSE) {

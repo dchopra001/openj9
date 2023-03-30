@@ -235,7 +235,7 @@ getModuleObjectClassLoader(J9VMThread * currentThread, j9object_t moduleObject)
 		J9ClassLoader *loader = J9VMJAVALANGCLASSLOADER_VMREF(currentThread, classLoader);
 		if (NULL == loader) {
 			J9JavaVM * const vm = currentThread->javaVM;
-			loader = vm->internalVMFunctions->internalAllocateClassLoader(vm, classLoader);
+			loader = vm->internalVMFunctions->internalAllocateClassLoader(vm, classLoader, 0);
 		}
 		return loader;
 	}

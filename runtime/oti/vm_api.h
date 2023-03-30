@@ -285,7 +285,7 @@ resolveNativeAddress(J9VMThread *currentThread, J9Method *nativeMethod, UDATA ru
 * @return J9ClassLoader
 */
 J9ClassLoader*
-internalAllocateClassLoader(J9JavaVM *javaVM, j9object_t classLoaderObject) ;
+internalAllocateClassLoader(J9JavaVM *javaVM, j9object_t classLoaderObject, int *internalAllocateClassLoaderResult) ;
 
 /**
 * @brief

@@ -6059,7 +6059,7 @@ JVM_DefineClassWithSource(JNIEnv *env, const char * className, jobject classLoad
 	loaderObject = J9_JNI_UNWRAP_REFERENCE(classLoader);
 	vmLoader = J9VMJAVALANGCLASSLOADER_VMREF(currentThread, loaderObject);
 	if (NULL == vmLoader) {
-		vmLoader = vmFuncs->internalAllocateClassLoader(vm, loaderObject);
+		vmLoader = vmFuncs->internalAllocateClassLoader(vm, loaderObject, 0);
 		if (NULL == vmLoader) {
 			vmFuncs->internalExitVMToJNI(currentThread);
 			return NULL;

@@ -79,7 +79,7 @@ cleanPackage(J9Package *package)
 }
 
 J9ClassLoader*
-internalAllocateClassLoader(J9JavaVM *javaVM, j9object_t classLoaderObject)
+internalAllocateClassLoader(J9JavaVM *javaVM, j9object_t classLoaderObject, int* internalAllocateClassLoaderResult)
 {
 	J9ClassLoader *classLoader = NULL;
 	J9VMThread *vmThread = currentVMThread(javaVM);
@@ -100,6 +100,7 @@ retry:
 	classLoader = J9VMJAVALANGCLASSLOADER_VMREF(vmThread, classLoaderObject);
 
 	if (NULL != classLoader) {
+		if (0 != internalAllocateClassLoaderResult) *internalAllocateClassLoaderResult |= 0x1;
 		RELEASE_CLASS_LOADER_BLOCKS_MUTEX(javaVM);
 		return classLoader;
 	}
@@ -107,7 +108,9 @@ retry:
 	classLoader = allocateClassLoader(javaVM);
 
 	if (NULL == classLoader) {
+		if (0 != internalAllocateClassLoaderResult) *internalAllocateClassLoaderResult |= 0x10;
 		if (!allocRetried) {
+			if (0 != internalAllocateClassLoaderResult) *internalAllocateClassLoaderResult |= 0x100;
 			allocRetried = TRUE;
 			RELEASE_CLASS_LOADER_BLOCKS_MUTEX(javaVM);
 			PUSH_OBJECT_IN_SPECIAL_FRAME(vmThread, classLoaderObject);
@@ -133,6 +136,7 @@ retry:
 	}
 
 	if (J9VMJAVALANGCLASSLOADER_ISPARALLELCAPABLE(vmThread, classLoaderObject)) {
+		if (0 != internalAllocateClassLoaderResult) *internalAllocateClassLoaderResult |= 0x1000;
 		classLoader->flags |= J9CLASSLOADER_PARALLEL_CAPABLE;
 	}
 	J9CLASSLOADER_SET_CLASSLOADEROBJECT(vmThread, classLoader, classLoaderObject);

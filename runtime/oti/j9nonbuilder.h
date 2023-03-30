@@ -4902,7 +4902,7 @@ typedef struct J9InternalVMFunctions {
 	void  ( *walkBytecodeFrameSlots)(J9StackWalkState *walkState, struct J9Method *method, UDATA offsetPC, UDATA *pendingBase, UDATA pendingStackHeight, UDATA *localBase, UDATA numberOfLocals, UDATA alwaysLocalMap) ;
 	void*  ( *jniNativeMethodProperties)(struct J9VMThread *currentThread, struct J9Method *jniNativeMethod, UDATA *properties) ;
 	void  ( *invalidJITReturnAddress)(J9StackWalkState *walkState) ;
-	struct J9ClassLoader*  ( *internalAllocateClassLoader)(struct J9JavaVM *javaVM, j9object_t classLoaderObject) ;
+	struct J9ClassLoader*  ( *internalAllocateClassLoader)(struct J9JavaVM *javaVM, j9object_t classLoaderObject, int *internalAllocateClassLoaderResult) ;
 	void  ( *initializeClass)(struct J9VMThread *currentThread, struct J9Class *clazz) ;
 	void  ( *threadParkImpl)(struct J9VMThread* vmThread, BOOLEAN timeoutIsEpochRelative, I_64 timeout) ;
 	void  ( *threadUnparkImpl)(struct J9VMThread* vmThread, j9object_t threadObject) ;

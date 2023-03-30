@@ -140,7 +140,7 @@ internalError:
 			}
 			allClassesEndDo(&classWalkState);
 		} else {
-			J9ClassLoader *classLoaderStruct = internalAllocateClassLoader(vm, classLoaderObject);
+			J9ClassLoader *classLoaderStruct = internalAllocateClassLoader(vm, classLoaderObject, 0);
 			if (J9_CLASSLOADER_TYPE_PLATFORM == loaderType) {
 				/* extensionClassLoader holds the platform class loader in Java 11+ */
 				vm->extensionClassLoader = classLoaderStruct;

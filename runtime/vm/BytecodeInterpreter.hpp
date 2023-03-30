@@ -4622,7 +4622,7 @@ internalError:
 			allClassesEndDo(&classWalkState);
 		} else {
 			updateVMStruct(REGISTER_ARGS);
-			J9ClassLoader* result = internalAllocateClassLoader(_vm, classLoaderObject);
+			J9ClassLoader* result = internalAllocateClassLoader(_vm, classLoaderObject, 0);
 			VMStructHasBeenUpdated(REGISTER_ARGS); // likely unnecessary - no code runs in internalAllocateClassLoader
 			if (NULL == result) {
 				rc = GOTO_THROW_CURRENT_EXCEPTION;
@@ -4708,7 +4708,7 @@ done:
 			if (NULL == classLoader) {
 				pushObjectInSpecialFrame(REGISTER_ARGS, classNameObject);
 				updateVMStruct(REGISTER_ARGS);
-				classLoader = internalAllocateClassLoader(_vm, classLoaderObject);
+				classLoader = internalAllocateClassLoader(_vm, classLoaderObject, 0);
 				VMStructHasBeenUpdated(REGISTER_ARGS);
 				classNameObject = popObjectInSpecialFrame(REGISTER_ARGS);
 				if (NULL == classLoader) {
@@ -4948,7 +4948,7 @@ nativeOOM:
 		} else {
 			classLoader = J9VMJAVALANGCLASSLOADER_VMREF(_currentThread, loader);
 			if (NULL == classLoader) {
-				classLoader = internalAllocateClassLoader(_vm, loader);
+				classLoader = internalAllocateClassLoader(_vm, loader, 0);
 				VMStructHasBeenUpdated(REGISTER_ARGS);
 				if (NULL == classLoader) {
 					rc = GOTO_THROW_CURRENT_EXCEPTION;

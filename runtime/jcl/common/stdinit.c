@@ -462,7 +462,7 @@ internalInitializeJavaLangClassLoader(JNIEnv * env)
 		 * applicationClassLoader may be null due to lazy classloader initialization. Initialize
 		 * the applicationClassLoader now or vm will start throwing NoClassDefFoundException.
 		 */
-		vm->applicationClassLoader = (void*) (UDATA)(vmFuncs->internalAllocateClassLoader(vm, J9_JNI_UNWRAP_REFERENCE(appClassLoader)));
+		vm->applicationClassLoader = (void*) (UDATA)(vmFuncs->internalAllocateClassLoader(vm, J9_JNI_UNWRAP_REFERENCE(appClassLoader), 0));
 		if (NULL != vmThread->currentException) {
 			/* while this exception check and return statement seem un-necessary, it is added to prevent
 			 * oversights if anybody adds more code in the future.
@@ -484,7 +484,7 @@ internalInitializeJavaLangClassLoader(JNIEnv * env)
 		vm->extensionClassLoader = J9VMJAVALANGCLASSLOADER_VMREF(vmThread, classLoaderObject);
 
 		if (NULL == vm->extensionClassLoader) {
-			vm->extensionClassLoader = (void*) (UDATA)(vmFuncs->internalAllocateClassLoader(vm, classLoaderObject));
+			vm->extensionClassLoader = (void*) (UDATA)(vmFuncs->internalAllocateClassLoader(vm, classLoaderObject, 0));
 			if (NULL != vmThread->currentException) {
 				/* while this exception check and return statement seem un-necessary, it is added to prevent
 				 * oversights if anybody adds more code in the future.
