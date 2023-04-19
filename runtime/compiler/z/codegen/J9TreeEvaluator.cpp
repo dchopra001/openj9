@@ -9288,8 +9288,12 @@ J9::Z::TreeEvaluator::VMmonentEvaluator(TR::Node * node, TR::CodeGenerator * cg)
 
    //Compare and Swap the lock value with R13 if the lock value is 0.
    static char * disableNIAITesting = feGetEnv("TR_disableNIAITesting");
+   TR::Register* niaiTempReg = cg->allocateRegister();
    if (!disableNIAITesting)
+      {
+      generateRXInstruction(cg, TR::InstOpCode::getLoadTestOpCode(), node, niaiTempReg, generateS390MemoryReference(baseReg, lwOffset, cg));
     	generateS390IEInstruction(cg, TR::InstOpCode::NIAI, 8, 0, node);
+      }
    generateRSInstruction(cg, casOp, node, monitorReg, metaReg, generateS390MemoryReference(baseReg, lwOffset, cg));
 
    // Jump to OOL branch in case that the CAS is unsuccessful (Lockword had contained a non-zero value before CAS)
@@ -9414,6 +9418,7 @@ J9::Z::TreeEvaluator::VMmonentEvaluator(TR::Node * node, TR::CodeGenerator * cg)
    generateS390LabelInstruction(cg, TR::InstOpCode::label, node, cFlowRegionEnd, conditions);
 
    cg->stopUsingRegister(monitorReg);
+   cg->stopUsingRegister(niaiTempReg);
    if (wasteReg)
       cg->stopUsingRegister(wasteReg);
    if (objectClassReg)
@@ -9708,6 +9713,13 @@ J9::Z::TreeEvaluator::VMmonexitEvaluator(TR::Node * node, TR::CodeGenerator * cg
 
    //TODO - use compareAndBranch instruction
    // Check if the lockWord in the object contains our VMThread
+   static char * disableNIAITesting = feGetEnv("TR_disableNIAITesting");
+   TR::Register* niaiTempReg = cg->allocateRegister();
+   if (!disableNIAITesting)
+      {
+      generateRXInstruction(cg, TR::InstOpCode::getLoadTestOpCode(), node, niaiTempReg, generateS390MemoryReference(baseReg, lwOffset, cg));
+      generateS390IEInstruction(cg, TR::InstOpCode::NIAI, 7, 0, node);
+      }
    generateRXInstruction(cg, compareImmOp, node, metaReg, generateS390MemoryReference(baseReg, lwOffset, cg));
    // If VMThread does not match, call helper.
    generateS390BranchInstruction(cg, TR::InstOpCode::BRC, TR::InstOpCode::COND_BNE, node, callLabel);
@@ -9717,9 +9729,6 @@ J9::Z::TreeEvaluator::VMmonexitEvaluator(TR::Node * node, TR::CodeGenerator * cg
       cg->generateDebugCounter("LockExit/Normal/MVHISuccessfull", 1, TR::DebugCounter::Undetermined);
    // If VMThread matches, we can safely perform the monitor exit by zero'ing
    // out the lockWord on the object
-   static char * disableNIAITesting = feGetEnv("TR_disableNIAITesting");
-   if (!disableNIAITesting)
-    	generateS390IEInstruction(cg, TR::InstOpCode::NIAI, 7, 0, node);
    generateSILInstruction(cg, moveImmOp, node, generateS390MemoryReference(baseReg, lwOffset, cg), 0);
 
 #if (JAVA_SPEC_VERSION >= 19)
@@ -9837,6 +9846,7 @@ J9::Z::TreeEvaluator::VMmonexitEvaluator(TR::Node * node, TR::CodeGenerator * cg
    generateS390LabelInstruction(cg, TR::InstOpCode::label, node, cFlowRegionEnd, conditions);
 
    cg->stopUsingRegister(monitorReg);
+   cg->stopUsingRegister(niaiTempReg);
    if (objectClassReg)
       cg->stopUsingRegister(objectClassReg);
    if (lookupOffsetReg)
