@@ -74,6 +74,7 @@
  */
 static bool avoidTransformingStringLoops(TR::Compilation* comp)
    {
+   return true;
    static bool cacheInitialized = false;
    static bool cacheValue = false;
 
