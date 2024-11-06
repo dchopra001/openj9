@@ -92,6 +92,122 @@ extern void killRegisterIfNotLocked(TR::CodeGenerator * cg, TR::RealRegister::Re
 extern TR::Register * iDivRemGenericEvaluator(TR::Node * node, TR::CodeGenerator * cg, bool isDivision, TR::MemoryReference * divchkDivisorMR);
 extern TR::Instruction * generateS390CompareOps(TR::Node * node, TR::CodeGenerator * cg, TR::InstOpCode::S390BranchCondition fBranchOpCond, TR::InstOpCode::S390BranchCondition rBranchOpCond, TR::LabelSymbol * targetLabel);
 
+TR::Register *
+J9::Z::TreeEvaluator::inlineStringCodingHasNegatives(TR::Node *node, TR::CodeGenerator *cg)
+   {
+   //TR_ASSERT_FATAL(false, "DCDCDCDC ==> inlineStringCodingHasNegatives\n");
+   /*
+   @IntrinsicCandidate
+    public static boolean hasNegatives(byte[] ba, int off, int len) {
+        for (int i = off; i < off + len; i++) {
+            if (ba[i] < 0) {
+                return true;
+            }
+        }
+        return false;
+    } *
+    */
+
+   TR::Register *inputPtrReg = cg->evaluate(node->getChild(0));
+   TR::Register *offsetReg = cg->evaluate(node->getChild(1));
+   TR::Register *lengthReg = cg->evaluate(node->getChild(2));
+
+   TR::LabelSymbol *processMultiple16CharsStart = generateLabelSymbol(cg);
+   TR::LabelSymbol *processMultiple16CharsEnd = generateLabelSymbol(cg);
+   TR::LabelSymbol *cFlowRegionEnd = generateLabelSymbol(cg);
+   TR::LabelSymbol *processSaturatedInput1 = generateLabelSymbol(cg);
+
+   TR::Register *vInput1 = cg->allocateRegister(TR_VRF);
+   TR::Register *vRange = cg->allocateRegister(TR_VRF);
+   TR::Register *vRangeControl = cg->allocateRegister(TR_VRF);
+   TR::Register *numCharsLeftToProcess = cg->allocateRegister(); // off + len
+   TR::Register *firstSaturatedCharacter = cg->allocateRegister(TR_VRF);
+
+   TR::Register *returnReg = cg->allocateRegister();
+   generateRILInstruction(cg, TR::InstOpCode::LGFI, node, returnReg, 0);
+
+   generateRRRInstruction(cg, TR::InstOpCode::getAddThreeRegOpCode(), node, numCharsLeftToProcess, offsetReg, lengthReg);
+
+   uint32_t saturatedRange = 127;
+   uint8_t saturatedRangeControl = 0x20; // > comparison
+
+   generateVRIaInstruction(cg, TR::InstOpCode::VREPI, node, vRange, saturatedRange, 0);
+   generateVRIaInstruction(cg, TR::InstOpCode::VREPI, node, vRangeControl, saturatedRangeControl, 0);
+
+   // Branch to the end of this section if there are less than 16 chars left to process
+   generateS390CompareAndBranchInstruction(cg, TR::InstOpCode::C, node, numCharsLeftToProcess, 16, TR::InstOpCode::COND_BL, processMultiple16CharsEnd, false, false);
+
+   generateS390LabelInstruction(cg, TR::InstOpCode::label, node, processMultiple16CharsStart);
+   processMultiple16CharsStart->setStartInternalControlFlow();
+
+   generateVRXInstruction(cg, TR::InstOpCode::VL, node, vInput1, generateS390MemoryReference(inputPtrReg, 0, cg));
+
+   generateVRRdInstruction(cg, TR::InstOpCode::VSTRC, node, firstSaturatedCharacter, vInput1, vRange, vRangeControl, 0x1, 0);
+
+   generateS390BranchInstruction(cg, TR::InstOpCode::BRC, TR::InstOpCode::COND_CC1, node, processSaturatedInput1); // process bad character by setting return register to true
+
+   // Update the counters
+   generateRXInstruction(cg, TR::InstOpCode::getLoadAddressOpCode(), node, inputPtrReg, generateS390MemoryReference(inputPtrReg, 16, cg));
+   generateRILInstruction(cg, TR::InstOpCode::SLFI, node, numCharsLeftToProcess, 16);
+
+   // Branch back up if we still have more than 16 characters to process.
+   generateS390CompareAndBranchInstruction(cg, TR::InstOpCode::C, node, numCharsLeftToProcess, 15, TR::InstOpCode::COND_BH, processMultiple16CharsStart, false, false);
+
+   generateS390LabelInstruction(cg, TR::InstOpCode::label, node, processMultiple16CharsEnd);
+
+   // start of sequence to process under 16 characters
+
+   // Branch to end if there's no residue
+   generateS390CompareAndBranchInstruction(cg, TR::InstOpCode::C, node, numCharsLeftToProcess, 0, TR::InstOpCode::COND_BE, cFlowRegionEnd, false, false);
+
+   // Zero out the input register to avoid invalid VSTRC result
+   generateVRIaInstruction(cg, TR::InstOpCode::VGBM, node, vInput1, 0, 0 /*unused*/);
+
+   // VLL and VSTL work on indices so we must subtract 1
+   TR::Register *numCharsLeftToProcessMinus1 = cg->allocateRegister();
+   // Due to the check above, the value in numCharsLeftToProcessMinus1 is guaranteed to be 0 or higher.
+   generateRIEInstruction(cg, TR::InstOpCode::AHIK, node, numCharsLeftToProcessMinus1, numCharsLeftToProcess, -1);
+   // Load residue bytes and check for saturation
+   generateVRSbInstruction(cg, TR::InstOpCode::VLL, node, vInput1, numCharsLeftToProcessMinus1, generateS390MemoryReference(inputPtrReg, 0, cg));
+
+   // Check for vector saturation and branch to copy the unsaturated bytes
+   generateVRRdInstruction(cg, TR::InstOpCode::VSTRC, node, firstSaturatedCharacter, vInput1, vRange, vRangeControl, 0x1, 0);
+   generateS390BranchInstruction(cg, TR::InstOpCode::BRC, TR::InstOpCode::COND_CC1, node, processSaturatedInput1);
+
+   // Branch to end.
+   generateS390BranchInstruction(cg, TR::InstOpCode::BRC, TR::InstOpCode::COND_BRC, node, cFlowRegionEnd);
+
+   generateS390LabelInstruction(cg, TR::InstOpCode::label, node, processSaturatedInput1);
+   generateRILInstruction(cg, TR::InstOpCode::LGFI, node, returnReg, 1);
+
+   TR::RegisterDependencyConditions* dependencies = new (cg->trHeapMemory()) TR::RegisterDependencyConditions(0, 8, cg);
+   dependencies->addPostConditionIfNotAlreadyInserted(vInput1, TR::RealRegister::AssignAny);
+   dependencies->addPostConditionIfNotAlreadyInserted(firstSaturatedCharacter, TR::RealRegister::AssignAny);
+   dependencies->addPostConditionIfNotAlreadyInserted(vRange, TR::RealRegister::AssignAny);
+   dependencies->addPostConditionIfNotAlreadyInserted(vRangeControl, TR::RealRegister::AssignAny);
+   dependencies->addPostConditionIfNotAlreadyInserted(inputPtrReg, TR::RealRegister::AssignAny);
+   dependencies->addPostConditionIfNotAlreadyInserted(numCharsLeftToProcess, TR::RealRegister::AssignAny);
+   dependencies->addPostConditionIfNotAlreadyInserted(numCharsLeftToProcessMinus1, TR::RealRegister::AssignAny);
+   dependencies->addPostConditionIfNotAlreadyInserted(returnReg, TR::RealRegister::AssignAny);
+
+   generateS390LabelInstruction(cg, TR::InstOpCode::label, node, cFlowRegionEnd, dependencies);
+   cFlowRegionEnd->setEndInternalControlFlow();
+
+   cg->decReferenceCount(node->getChild(0));
+   cg->decReferenceCount(node->getChild(1));
+   cg->decReferenceCount(node->getChild(2));
+
+   cg->stopUsingRegister(vInput1);
+   cg->stopUsingRegister(firstSaturatedCharacter);
+   cg->stopUsingRegister(vRange);
+   cg->stopUsingRegister(vRangeControl);
+   cg->stopUsingRegister(numCharsLeftToProcess);
+   cg->stopUsingRegister(numCharsLeftToProcessMinus1);
+   node->setRegister(returnReg);
+   return returnReg;
+   }
+
+
 void
 J9::Z::TreeEvaluator::inlineEncodeASCII(TR::Node *node, TR::CodeGenerator *cg)
    {
