@@ -108,7 +108,7 @@ J9::Z::TreeEvaluator::inlineStringCodingHasNegatives(TR::Node *node, TR::CodeGen
     } *
     */
 
-   TR::Register *inputPtrReg = cg->evaluate(node->getChild(0));
+   TR::Register *inputPtrReg = cg->gprClobberEvaluate(node->getChild(0));
    TR::Register *offsetReg = cg->evaluate(node->getChild(1));
    TR::Register *lengthReg = cg->evaluate(node->getChild(2));
 
@@ -140,7 +140,7 @@ J9::Z::TreeEvaluator::inlineStringCodingHasNegatives(TR::Node *node, TR::CodeGen
    generateS390LabelInstruction(cg, TR::InstOpCode::label, node, processMultiple16CharsStart);
    processMultiple16CharsStart->setStartInternalControlFlow();
 
-   generateVRXInstruction(cg, TR::InstOpCode::VL, node, vInput1, generateS390MemoryReference(inputPtrReg, 0, cg));
+   generateVRXInstruction(cg, TR::InstOpCode::VL, node, vInput1, generateS390MemoryReference(inputPtrReg, TR::Compiler->om.contiguousArrayHeaderSizeInBytes(), cg));
 
    generateVRRdInstruction(cg, TR::InstOpCode::VSTRC, node, firstSaturatedCharacter, vInput1, vRange, vRangeControl, 0x1, 0);
 
@@ -168,7 +168,7 @@ J9::Z::TreeEvaluator::inlineStringCodingHasNegatives(TR::Node *node, TR::CodeGen
    // Due to the check above, the value in numCharsLeftToProcessMinus1 is guaranteed to be 0 or higher.
    generateRIEInstruction(cg, TR::InstOpCode::AHIK, node, numCharsLeftToProcessMinus1, numCharsLeftToProcess, -1);
    // Load residue bytes and check for saturation
-   generateVRSbInstruction(cg, TR::InstOpCode::VLL, node, vInput1, numCharsLeftToProcessMinus1, generateS390MemoryReference(inputPtrReg, 0, cg));
+   generateVRSbInstruction(cg, TR::InstOpCode::VLL, node, vInput1, numCharsLeftToProcessMinus1, generateS390MemoryReference(inputPtrReg, TR::Compiler->om.contiguousArrayHeaderSizeInBytes(), cg));
 
    // Check for vector saturation and branch to copy the unsaturated bytes
    generateVRRdInstruction(cg, TR::InstOpCode::VSTRC, node, firstSaturatedCharacter, vInput1, vRange, vRangeControl, 0x1, 0);
