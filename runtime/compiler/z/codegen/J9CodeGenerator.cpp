@@ -106,8 +106,8 @@ J9::Z::CodeGenerator::initialize()
       cg->setSupportsInlineStringLatin1Inflate();
       }
 
-   static bool enableInlineStringCodingHasNegatives = feGetEnv("TR_EnableInlineStringCodingHasNegatives") != NULL;
-   if (cg->getSupportsVectorRegisters() && enableInlineStringCodingHasNegatives &&
+   static bool disableInlineStringCodingHasNegatives = feGetEnv("TR_DisableInlineStringCodingHasNegatives") != NULL;
+   if (cg->getSupportsVectorRegisters() && !disableInlineStringCodingHasNegatives &&
         !TR::Compiler->om.canGenerateArraylets())
       {
       cg->setSupportsInlineStringCodingHasNegatives();
