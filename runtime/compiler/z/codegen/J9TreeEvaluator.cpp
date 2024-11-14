@@ -169,7 +169,7 @@ J9::Z::TreeEvaluator::inlineEncodeASCII(TR::Node *node, TR::CodeGenerator *cg)
    generateRILInstruction(cg, TR::InstOpCode::SLFI, node, numCharsLeftToProcess, 16);
 
    // Branch back up if we still have more than 16 characters to process.
-   generateS390CompareAndBranchInstruction(cg, TR::InstOpCode::C, node, numCharsLeftToProcess, 15, TR::InstOpCode::COND_BH, processMultiple16CharsStart, false, false);
+   generateS390CompareAndBranchInstruction(cg, TR::InstOpCode::C, node, numCharsLeftToProcess, 16, TR::InstOpCode::COND_BH, processMultiple16CharsStart, false, false);
 
    generateS390LabelInstruction(cg, TR::InstOpCode::label, node, processMultiple16CharsEnd);
 
@@ -860,7 +860,7 @@ J9::Z::TreeEvaluator::pdclearSetSignEvaluator(TR::Node *node, TR::CodeGenerator 
 
 /*
  * This method inlines the Java API StringCoding.hasNegatives(byte src, int off, int len) using
- * SIMD instructions (it will only be invoked on supported processors).
+ * SIMD instructions.
  * The method looks like below on Java 17:
  *
  *   @IntrinsicCandidate
@@ -877,7 +877,6 @@ J9::Z::TreeEvaluator::pdclearSetSignEvaluator(TR::Node *node, TR::CodeGenerator 
 TR::Register *
 J9::Z::TreeEvaluator::inlineStringCodingHasNegatives(TR::Node *node, TR::CodeGenerator *cg)
    {
-
    TR::Register *inputPtrReg = cg->gprClobberEvaluate(node->getChild(0));
    TR::Register *offsetReg = cg->evaluate(node->getChild(1));
    TR::Register *lengthReg = cg->evaluate(node->getChild(2));
@@ -894,9 +893,9 @@ J9::Z::TreeEvaluator::inlineStringCodingHasNegatives(TR::Node *node, TR::CodeGen
    TR::Register *outOfRangeCharIndex = cg->allocateRegister(TR_VRF);
 
    TR::Register *returnReg = cg->allocateRegister();
-   generateRILInstruction(cg, TR::InstOpCode::LGFI, node, returnReg, 0);
+   generateRIInstruction(cg, TR::InstOpCode::LGHI, node, returnReg, 0);
 
-   generateRRRInstruction(cg, TR::InstOpCode::getAddThreeRegOpCode(), node, numCharsLeftToProcess, offsetReg, lengthReg);
+   generateRRRInstruction(cg, TR::InstOpCode::ARK, node, numCharsLeftToProcess, offsetReg, lengthReg);
 
    const uint8_t upperLimit = 127;
    const uint8_t rangeComparison = 0x20; // > comparison
@@ -919,7 +918,7 @@ J9::Z::TreeEvaluator::inlineStringCodingHasNegatives(TR::Node *node, TR::CodeGen
 
    // Update the counters
    generateRXInstruction(cg, TR::InstOpCode::getLoadAddressOpCode(), node, inputPtrReg, generateS390MemoryReference(inputPtrReg, 16, cg));
-   generateRILInstruction(cg, TR::InstOpCode::SLFI, node, numCharsLeftToProcess, 16);
+   generateRIInstruction(cg, TR::InstOpCode::AHI, node, numCharsLeftToProcess, -16);
 
    // Branch back up if we still have more than 16 characters to process.
    generateS390CompareAndBranchInstruction(cg, TR::InstOpCode::C, node, numCharsLeftToProcess, 15, TR::InstOpCode::COND_BH, processMultiple16CharsStart, false, false);
@@ -946,7 +945,7 @@ J9::Z::TreeEvaluator::inlineStringCodingHasNegatives(TR::Node *node, TR::CodeGen
    generateS390BranchInstruction(cg, TR::InstOpCode::BRC, TR::InstOpCode::COND_BRC, node, cFlowRegionEnd);
 
    generateS390LabelInstruction(cg, TR::InstOpCode::label, node, processOutOfRangeChar);
-   generateRILInstruction(cg, TR::InstOpCode::LGFI, node, returnReg, 1);
+   generateRIInstruction(cg, TR::InstOpCode::LGHI, node, returnReg, 1);
 
    TR::RegisterDependencyConditions* dependencies = new (cg->trHeapMemory()) TR::RegisterDependencyConditions(0, 8, cg);
    dependencies->addPostConditionIfNotAlreadyInserted(vInput, TR::RealRegister::AssignAny);
@@ -961,9 +960,10 @@ J9::Z::TreeEvaluator::inlineStringCodingHasNegatives(TR::Node *node, TR::CodeGen
    generateS390LabelInstruction(cg, TR::InstOpCode::label, node, cFlowRegionEnd, dependencies);
    cFlowRegionEnd->setEndInternalControlFlow();
 
-   cg->decReferenceCount(node->getChild(0));
-   cg->decReferenceCount(node->getChild(1));
-   cg->decReferenceCount(node->getChild(2));
+   for (int i = 0; i < node->getNumChildren(); i++)
+      {
+      cg->decReferenceCount(node->getChild(i));
+      }
 
    cg->stopUsingRegister(vInput);
    cg->stopUsingRegister(outOfRangeCharIndex);
