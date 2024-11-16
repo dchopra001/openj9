@@ -897,6 +897,8 @@ J9::Z::TreeEvaluator::inlineStringCodingHasNegatives(TR::Node *node, TR::CodeGen
 
    generateRRRInstruction(cg, TR::InstOpCode::ARK, node, numCharsLeftToProcess, offsetReg, lengthReg);
 
+   generateS390CompareAndBranchInstruction(cg, TR::InstOpCode::C, node, numCharsLeftToProcess, 0, TR::InstOpCode::COND_BE, cFlowRegionEnd, false, false);
+
    const uint8_t upperLimit = 127;
    const uint8_t rangeComparison = 0x20; // > comparison
 
