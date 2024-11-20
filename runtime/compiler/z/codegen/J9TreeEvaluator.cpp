@@ -895,7 +895,13 @@ J9::Z::TreeEvaluator::inlineStringCodingHasNegatives(TR::Node *node, TR::CodeGen
    TR::Register *returnReg = cg->allocateRegister();
    generateRIInstruction(cg, TR::InstOpCode::LGHI, node, returnReg, 0);
 
-   generateRRRInstruction(cg, TR::InstOpCode::ARK, node, numCharsLeftToProcess, offsetReg, lengthReg);
+   //generateRRRInstruction(cg, TR::InstOpCode::ARK, node, numCharsLeftToProcess, offsetReg, lengthReg);
+   //generateRXInstruction(cg, TR::InstOpCode::getLoadAddressOpCode(), node, inputPtrReg, generateS390MemoryReference(inputPtrReg, offsetReg, 0, cg));
+   generateRRInstruction(cg, TR::InstOpCode::AGFR, node, inputPtrReg, offsetReg);
+
+   //generateRRRInstruction(cg, TR::InstOpCode::ARK, node, numCharsLeftToProcess, offsetReg, lengthReg);
+   generateS390CompareAndBranchInstruction(cg, TR::InstOpCode::C, node, lengthReg, 0, TR::InstOpCode::COND_BE, cFlowRegionEnd, false, false);
+   generateRRInstruction(cg, TR::InstOpCode::LR, node, numCharsLeftToProcess, lengthReg);
 
    const uint8_t upperLimit = 127;
    const uint8_t rangeComparison = 0x20; // > comparison
