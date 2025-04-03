@@ -5623,6 +5623,12 @@ TR_J9InlinerPolicy::supressInliningRecognizedInitialCallee(TR_CallSite* callsite
             return true;
             }
          break;
+      case TR::sun_nio_cs_SingleByteDecoder_decodeToLatin1Impl:
+         if (comp->cg()->getSupportsInlineDecodeToLatin1())
+            {
+            return true;
+            }
+        break;
       case TR::java_lang_Thread_onSpinWait:
          {
          static char *disableOSW = feGetEnv("TR_noPauseOnSpinWait");
