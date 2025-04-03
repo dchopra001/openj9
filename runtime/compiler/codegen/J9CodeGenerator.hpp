@@ -460,6 +460,10 @@ public:
    */
    void setSupportsInlineStringHashCode() { _j9Flags.set(SupportsInlineStringHashCode); }
 
+   bool getSupportsInlineDecodeToLatin1() { return _j9Flags.testAny(SupportsInlineDecodeToLatin1); }
+
+   void setSupportsInlineDecodeToLatin1() { _j9Flags.set(SupportsInlineDecodeToLatin1); }
+
    /** \brief
    *    Determines whether the code generator supports inlining of java/lang/StringCoding.countPositives
    */
@@ -731,6 +735,7 @@ private:
       SupportsInlineMath_MaxMin_FD                        = 0x00010000,
       SupportsInlineUnsafeCompareAndSet                   = 0x00020000,
       SupportsInlineUnsafeCompareAndExchange              = 0x00040000,
+      SupportsInlineDecodeToLatin1                        = 0x00080000,
       };
 
    flags32_t _j9Flags;

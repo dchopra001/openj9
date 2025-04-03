@@ -140,6 +140,14 @@ J9::Z::CodeGenerator::initialize()
       cg->resetSupportsArrayTranslateTRxx();
       }
 
+   static char *disableInlineDecodeToLatin1 = feGetEnv("TR_disableInlineDecodeToLatin1");
+   if (!TR::Compiler->om.canGenerateArraylets() && !disableInlineDecodeToLatin1)
+      {
+      cg->setSupportsInlineDecodeToLatin1();
+      }
+
+
+
    static char *disableInlineEncodeASCII = feGetEnv("TR_disableInlineEncodeASCII");
    if (comp->fej9()->isStringCompressionEnabledVM() && cg->getSupportsVectorRegisters() && !TR::Compiler->om.canGenerateArraylets() && !TR::Compiler->om.isOffHeapAllocationEnabled() && !disableInlineEncodeASCII)
       {
