@@ -120,6 +120,7 @@ class RecognizedCallTransformer : public OMR::RecognizedCallTransformer
     *       <val>
     *     \endcode
     */
+   void process_sun_nio_cs_SingleByteDecoder_decodeToLatin1Impl(TR::TreeTop* treetop, TR::Node* node);
    void process_java_lang_StringCoding_encodeASCII(TR::TreeTop* treetop, TR::Node* node);
    /** \brief
     *     Transforms java/lang/StringLatin1.inflate([BI[BII)V using arraytranslate
