@@ -5618,6 +5618,11 @@ TR_J9InlinerPolicy::supressInliningRecognizedInitialCallee(TR_CallSite* callsite
             {
             return true;
             }
+      case TR::sun_nio_cs_SingleByteDecoder_decodeToLatin1Impl:
+         if (comp->cg()->getSupportsInlineDecodeToLatin1())
+            {
+            return true;
+            }
          break;
       default:
          break;

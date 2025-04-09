@@ -3780,9 +3780,15 @@ void TR_ResolvedJ9Method::construct()
       {x(TR::sun_nio_cs_ext_SBCS_Decoder_decodeSBCS,              "decodeSBCS",           "([BII[CI[C)I")},
       {x(TR::sun_nio_cs_UTF_8_Encoder_encodeUTF_8,                "encodeUTF_8",     "([CII[BI)I")},
       {x(TR::sun_nio_cs_UTF_8_Decoder_decodeUTF_8,                "decodeUTF_8",          "([BII[CI)I")},
+      {x(TR::sun_nio_cs_SingleByteDecoder_decodeToLatin1Impl,     "SingleByte$Decoder",          "([BII[B[B)I")},
       {  TR::unknownMethod}
       };
 
+   static X SingleByteDecoderMethods[] =
+      {
+      {x(TR::sun_nio_cs_SingleByteDecoder_decodeToLatin1Impl,      "SingleByte$Decoder", "([BII[B[B)I")},
+      {  TR::unknownMethod}
+      };
    static X IBM1388EncoderMethods[] =
       {
       {x(TR::sun_nio_cs_ext_IBM1388_Encoder_encodeArrayLoop,      "encodeArrayLoop", "(Ljava/nio/CharBuffer;Ljava/nio/ByteBuffer;)Ljava/nio/charset/CoderResult;")},
@@ -4188,6 +4194,7 @@ void TR_ResolvedJ9Method::construct()
       { "java/lang/reflect/Method", MethodMethods },
       { "sun/nio/cs/UTF_8$Decoder", EncodeMethods },
       { "sun/nio/cs/UTF_8$Encoder", EncodeMethods },
+      { "sun/nio/cs/SingleByte$Decoder", SingleByteDecoderMethods },}
       { "jdk/internal/misc/Unsafe", UnsafeMethods },
       { 0 }
       };

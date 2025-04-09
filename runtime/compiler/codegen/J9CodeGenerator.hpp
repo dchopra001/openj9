@@ -507,6 +507,10 @@ public:
 	*/
    bool getSupportsInlineEncodeASCII() { return _j9Flags.testAny(SupportsInlineEncodeASCII); }
 
+   bool getSupportsInlineDecodeToLatin1() { return _j9Flags.testAny(SupportsInlineDecodeToLatin1); }
+
+   void setSupportsInlineDecodeToLatin1() { _j9Flags.set(SupportsInlineDecodeToLatin1); }
+
    /** \brief
 	*   The code generator supports inlining of java/lang/StringCoding.encodeASCII
 	*/
@@ -699,6 +703,7 @@ private:
       SupportsInlineVectorizedHashCode                    = 0x00002000,
       SupportsInlineStringCodingHasNegatives              = 0x00004000,
       SupportsInlineStringCodingCountPositives            = 0x00008000,
+      SupportsInlineDecodeToLatin1                        = 0x00010000,
       };
 
    flags32_t _j9Flags;

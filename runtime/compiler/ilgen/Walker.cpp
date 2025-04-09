@@ -6441,6 +6441,7 @@ TR_J9ByteCodeIlGenerator::genNewArray(int32_t typeIndex)
         case TR::java_lang_StringCoding_encodeASCII:
         case TR::java_lang_String_encodeASCII:
         case TR::java_lang_StringCoding_encodeUTF8:
+        case TR::sun_nio_cs_SingleByteDecoder_decodeToLatin1Impl:
            node->setCanSkipZeroInitialization(true);
            break;
 

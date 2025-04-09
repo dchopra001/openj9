@@ -168,6 +168,57 @@ void J9::RecognizedCallTransformer::process_java_lang_Class_cast(
    node->recursivelyDecReferenceCount();
    }
 
+void J9::RecognizedCallTransformer::process_sun_nio_cs_SingleByteDecoder_decodeToLatin1Impl(TR::TreeTop* treetop, TR::Node* node)
+   {
+   TR_J9VMBase *fej9 = static_cast<TR_J9VMBase*>(comp()->fe());
+   TR::CFG *cfg = comp()->getFlowGraph();
+
+   // create a duplicate of the call tree
+   TR::TreeTop *dupCallTree = TR::TreeTop::create(comp());
+   TR::Node* dupCallNode = treetop->getNode()->duplicateTree();
+   dupCallTree->setNode(dupCallNode);
+
+
+   // reuse callTree
+   TR::TreeTop* arrayTranslateTree  = treetop;
+   TR::Node* arrayTranslateNode = arrayTranslateTree->getNode();
+   arrayTranslateNode->removeAllChildren();
+
+   TR::Node * srcObjNode = NULL;
+   TR::Node * dstObjNode = NULL;
+   TR::Node * len = NULL;
+   //TR::Node * srcOff = NULL;
+   //TR::Node * dstOff = NULL;
+   TR::Node * tableNode = NULL;
+   TR::Node * termCharNode = NULL;
+   TR::Node * stoppingNode = NULL;
+
+   // decodeToLatin1Impl(byte[] src, int sp, int len, byte[] dst, byte[] map) {
+   srcObjNode = dupCallNode->getChild(0);
+   dstObjNode = dupCallNode->getChild(3);
+   len = dupCallNode->getChild(2);
+   tableNode = dupCallNode->getChild(4);
+
+   TR::Node* arrayTranslateNode = TR::Node::create(arrayTranslateTree->getNode()->getFirstChild(), TR::arraytranslate, 6);
+   arrayTranslateNode->setSymbolReference(comp()->getSymRefTab()->findOrCreateArrayTranslateSymbol());
+
+   termCharNode = TR::Node::create(callNode,TR::iconst, 0, 0xff);
+   stoppingNode = TR::Node::create(callNode,TR::iconst, 0, 0xff);
+
+   arrayTranslateNode->setTermCharNodeIsHint(true);
+   arrayTranslateNode->setSourceCellIsTermChar(false);
+   arrayTranslateNode->setTableBackedByRawStorage(true);
+
+   arrayTranslateNode->setAndIncChild(2, tableNode);
+   arrayTranslateNode->setAndIncChild(3, termCharNode);
+   arrayTranslateNode->setAndIncChild(4, len);
+   arrayTranslateNode->setAndIncChild(5, stoppingNode);
+
+   arrayTranslateNode->setSourceIsByteArrayTranslate(true);
+   arrayTranslateNode->setTargetIsByteArrayTranslate(true);
+
+   }
+
 // This methods inlines a call node that calls StringCoding.encodeASCII into an if-diamond. The forward path of the
 // if-diamond inlines the call using a compiler intrinsic and the fallback path reverts back to calling the method traditionally.
 void J9::RecognizedCallTransformer::process_java_lang_StringCoding_encodeASCII(TR::TreeTop* treetop, TR::Node* node)
@@ -1446,6 +1497,8 @@ bool J9::RecognizedCallTransformer::isInlineable(TR::TreeTop* treetop)
          case TR::java_lang_Integer_reverseBytes:
          case TR::java_lang_Long_reverseBytes:
             return comp()->cg()->supportsByteswap();
+         case TR::sun_nio_cs_SingleByteDecoder_decodeToLatin1Impl:
+            return comp()->cg()->getSupportsInlineDecodeToLatin1();
          case TR::java_lang_StringCoding_encodeASCII:
          case TR::java_lang_String_encodeASCII:
             return comp()->cg()->getSupportsInlineEncodeASCII();
@@ -1568,6 +1621,9 @@ void J9::RecognizedCallTransformer::transform(TR::TreeTop* treetop)
             break;
          case TR::java_lang_StringUTF16_toBytes:
             process_java_lang_StringUTF16_toBytes(treetop, node);
+            break;
+         case TR::sun_nio_cs_SingleByteDecoder_decodeToLatin1Impl:
+            process_sun_nio_cs_SingleByteDecoder_decodeToLatin1Impl(treetop, node);
             break;
          case TR::java_lang_StringCoding_encodeASCII:
          case TR::java_lang_String_encodeASCII:
