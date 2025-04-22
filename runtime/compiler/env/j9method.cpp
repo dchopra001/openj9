@@ -3791,6 +3791,18 @@ void TR_ResolvedJ9Method::construct()
       {  TR::unknownMethod}
       };
 
+   static X SingleByteDecoderMethods[] =
+      {
+      {x(TR::sun_nio_cs_SingleByteDecoder_decodeToLatin1Impl,      "decodeToLatin1Impl", "([BII[BI[B)I")},
+      {  TR::unknownMethod}
+      };
+
+   static X ArrayDecoderMethods[] =
+      {
+      {x(TR::sun_nio_cs_ArrayDecoder_decodeToLatin1,     "decodeToLatin1", "([BII[B)I")},
+      {   TR::unknownMethod}
+      };
+
    static X IBM1388EncoderMethods[] =
       {
       {x(TR::sun_nio_cs_ext_IBM1388_Encoder_encodeArrayLoop,      "encodeArrayLoop", "(Ljava/nio/CharBuffer;Ljava/nio/ByteBuffer;)Ljava/nio/charset/CoderResult;")},
@@ -4197,6 +4209,8 @@ void TR_ResolvedJ9Method::construct()
       { "sun/nio/cs/UTF_8$Decoder", EncodeMethods },
       { "sun/nio/cs/UTF_8$Encoder", EncodeMethods },
       { "sun/nio/cs/UTF16_Encoder", EncodeMethods },
+      { "sun/nio/cs/SingleByte$Decoder", SingleByteDecoderMethods },
+      { "sun/nio/cs/ArrayDecoder", ArrayDecoderMethods },
       { "jdk/internal/misc/Unsafe", UnsafeMethods },
       { 0 }
       };
