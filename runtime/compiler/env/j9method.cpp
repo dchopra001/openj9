@@ -3792,6 +3792,7 @@ void TR_ResolvedJ9Method::construct()
 
    static X SingleByteDecoderMethods[] =
       {
+      // SingleByteDecoder_decodeToLatin1Impl is used by Semeru Runtime for z/OS.
       {x(TR::sun_nio_cs_SingleByteDecoder_decodeToLatin1Impl,      "decodeToLatin1Impl", "([BII[BI[B)I")},
       {  TR::unknownMethod}
       };

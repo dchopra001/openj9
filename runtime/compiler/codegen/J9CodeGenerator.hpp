@@ -503,6 +503,16 @@ public:
    void setSupportsInlineConcurrentLinkedQueue() { _j9Flags.set(SupportsInlineConcurrentLinkedQueue); }
 
    /** \brief
+	*   Determines whether the code generator supports inlining of sun/nio/cs/SingleByte$Decoder.decodeToLatin1Impl
+	*/
+   bool getSupportsInlineDecodeToLatin1Impl() { return _j9Flags.testAny(SupportsInlineDecodeToLatin1Impl); }
+
+   /** \brief
+	*   The code generator supports inlining of sun/nio/cs/SingleByte$Decoder.decodeToLatin1Impl
+	*/
+   void setSupportsInlineDecodeToLatin1Impl() { _j9Flags.set(SupportsInlineDecodeToLatin1Impl); }
+
+   /** \brief
 	*   Determines whether the code generator supports inlining of java/lang/StringCoding.encodeASCII
 	*/
    bool getSupportsInlineEncodeASCII() { return _j9Flags.testAny(SupportsInlineEncodeASCII); }
@@ -764,6 +774,7 @@ private:
       SupportsInlineMath_MaxMin_FD                        = 0x00010000,
       SupportsInlineUnsafeCompareAndSet                   = 0x00020000,
       SupportsInlineUnsafeCompareAndExchange              = 0x00040000,
+      SupportsInlineDecodeToLatin1Impl                    = 0x00080000,
       };
 
    flags32_t _j9Flags;
