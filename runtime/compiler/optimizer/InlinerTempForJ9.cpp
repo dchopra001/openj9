@@ -5468,6 +5468,16 @@ bool TR_J9InlinerPolicy::suppressInliningRecognizedInitialCallee(TR_CallSite *ca
                 return true;
             }
             break;
+        case TR::java_lang_StringCoding_hasNegatives:
+            if (cg->getSupportsInlineStringCodingHasNegatives()) {
+                return true;
+            }
+            break;
+        case TR::java_lang_StringCoding_countPositives:
+            if (cg->getSupportsInlineStringCodingCountPositives()) {
+                return true;
+            }
+            break;
         case TR::java_lang_Integer_stringSize:
         case TR::java_lang_Long_stringSize:
             if (cg->getSupportsIntegerStringSize()) {

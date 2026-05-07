@@ -572,6 +572,26 @@ public:
     void setSupportsInlineVectorizedHashCode() { _j9Flags.set(SupportsInlineVectorizedHashCode); }
 
     /** \brief
+     *   Determines whether the code generator supports inlining of java/lang/StringCoding.hasNegatives
+     */
+    bool getSupportsInlineStringCodingHasNegatives() { return _j9Flags.testAny(SupportsInlineStringCodingHasNegatives); }
+
+    /** \brief
+     *   The code generator supports inlining of java/lang/StringCoding.hasNegatives
+     */
+    void setSupportsInlineStringCodingHasNegatives() { _j9Flags.set(SupportsInlineStringCodingHasNegatives); }
+
+    /** \brief
+     *   Determines whether the code generator supports inlining of java/lang/StringCoding.countPositives
+     */
+    bool getSupportsInlineStringCodingCountPositives() { return _j9Flags.testAny(SupportsInlineStringCodingCountPositives); }
+
+    /** \brief
+     *   The code generator supports inlining of java/lang/StringCoding.countPositives
+     */
+    void setSupportsInlineStringCodingCountPositives() { _j9Flags.set(SupportsInlineStringCodingCountPositives); }
+
+    /** \brief
      *   Determines whether the code generator supports inlining of java_lang_Math_max/min_F/D
      */
     bool getSupportsInlineMath_MaxMin_FD() { return _j9Flags.testAny(SupportsInlineMath_MaxMin_FD); }
@@ -820,6 +840,8 @@ private:
         SupportsInlineUnsafeCompareAndExchange = 0x00040000,
         SupportsInlineStringIndexOfString = 0x00080000, /*! codegen inlining of Java string index of string */
         SupportsInlineDecodeToLatin1Impl = 0x00100000,
+        SupportsInlineStringCodingHasNegatives = 0x00200000, /*! codegen inlining of StringCoding.hasNegatives */
+        SupportsInlineStringCodingCountPositives = 0x00400000, /*! codegen inlining of StringCoding.countPositives */
     };
 
     flags32_t _j9Flags;

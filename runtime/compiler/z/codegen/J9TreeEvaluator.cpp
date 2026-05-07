@@ -864,6 +864,223 @@ TR::Register *J9::Z::TreeEvaluator::pdclearSetSignEvaluator(TR::Node *node, TR::
 {
     return TR::TreeEvaluator::pdclearEvaluator(node, cg);
 }
+/*
+ * This method inlines the Java APIs StringCoding.hasNegatives(byte[] src, int off, int len),
+ * StringCoding.countPositives(byte[] src, int off, int len), and
+ * StringCoding.countNonZeroAsciiLatin1(byte[] src, int off, int len) using SIMD instructions.
+ *
+ * StringCoding.hasNegatives is available on Java 11, 17 and 21:
+ *   @IntrinsicCandidate
+ *   public static boolean hasNegatives(byte[] ba, int off, int len) {
+ *       for (int i = off; i < off + len; i++) {
+ *           if (ba[i] < 0) {
+ *               return true;
+ *           }
+ *       }
+ *       return false;
+ *   }
+ *
+ * StringCoding.countPositives is available on Java 21 and newer:
+ *  @IntrinsicCandidate
+ *  public static int countPositives(byte[] ba, int off, int len) {
+ *      int limit = off + len;
+ *      for (int i = off; i < limit; i++) {
+ *          if (ba[i] < 0) {
+ *              return i - off;
+ *          }
+ *      }
+ *      return len;
+ *  }
+ *
+ * For countNonZeroAsciiLatin1, we need to find bytes <= 0, which means: byte == 0 OR byte < 0
+ * For countPositives/hasNegatives, we need to find bytes < 0, which means: byte > 127 (unsigned)
+ *
+ * This implementation uses the VSTRC (Vector String Range Compare) instruction to efficiently
+ * detect negative bytes (bytes with the high bit set, i.e., values 0x80-0xFF).
+ */
+TR::Register *J9::Z::TreeEvaluator::inlineStringCodingHasNegativesOrCountPositives(TR::Node *node,
+    TR::CodeGenerator *cg, bool isCountPositives, bool isCountNonZero)
+{
+    TR::Compilation *comp = cg->comp();
+    
+    // Get the children nodes
+    TR::Node *arrayNode = node->getChild(0);      // byte array
+    TR::Node *offsetNode = node->getChild(1);     // offset
+    TR::Node *lengthNode = node->getChild(2);     // length
+    
+    // Evaluate children
+    TR::Register *arrayReg = cg->gprClobberEvaluate(arrayNode);
+    TR::Register *offsetReg = cg->evaluate(offsetNode);
+    TR::Register *lengthReg = cg->evaluate(lengthNode);
+    
+    // Allocate registers
+    TR::Register *resultReg = cg->allocateRegister();
+    TR::Register *indexReg = cg->allocateRegister();
+    TR::Register *limitReg = cg->allocateRegister();
+    TR::Register *numCharsLeftReg = cg->allocateRegister();
+    TR::Register *vInput = cg->allocateRegister(TR_VRF);
+    TR::Register *vRange = cg->allocateRegister(TR_VRF);
+    TR::Register *vRangeControl = cg->allocateRegister(TR_VRF);
+    TR::Register *vResult = cg->allocateRegister(TR_VRF);
+    
+    // Create labels
+    TR::LabelSymbol *startLabel = generateLabelSymbol(cg);
+    TR::LabelSymbol *vectorLoopLabel = generateLabelSymbol(cg);
+    TR::LabelSymbol *vectorLoopEndLabel = generateLabelSymbol(cg);
+    TR::LabelSymbol *residualLabel = generateLabelSymbol(cg);
+    TR::LabelSymbol *foundNegativeLabel = generateLabelSymbol(cg);
+    TR::LabelSymbol *noNegativeLabel = generateLabelSymbol(cg);
+    TR::LabelSymbol *endLabel = generateLabelSymbol(cg);
+    
+    startLabel->setStartInternalControlFlow();
+    endLabel->setEndInternalControlFlow();
+    
+    generateS390LabelInstruction(cg, TR::InstOpCode::label, node, startLabel);
+    
+    // Handle off-heap arrays if enabled
+#ifdef J9VM_GC_SPARSE_HEAP_ALLOCATION
+    if (TR::Compiler->om.isOffHeapAllocationEnabled()) {
+        generateRXInstruction(cg, TR::InstOpCode::LG, node, arrayReg,
+            generateS390MemoryReference(arrayReg, comp->fej9()->getOffsetOfContiguousDataAddrField(), cg));
+    } else
+#endif
+    {
+        // Add array header offset to get to the data
+        generateRXInstruction(cg, TR::InstOpCode::getLoadAddressOpCode(), node, arrayReg,
+            generateS390MemoryReference(arrayReg, TR::Compiler->om.contiguousArrayHeaderSizeInBytes(), cg));
+    }
+    
+    // index = offset
+    generateRRInstruction(cg, TR::InstOpCode::LR, node, indexReg, offsetReg);
+    
+    // limit = offset + length
+    generateRRInstruction(cg, TR::InstOpCode::LR, node, limitReg, offsetReg);
+    generateRRInstruction(cg, TR::InstOpCode::AR, node, limitReg, lengthReg);
+    
+    // numCharsLeft = length
+    generateRRInstruction(cg, TR::InstOpCode::LR, node, numCharsLeftReg, lengthReg);
+    
+    // Check if length < 16, if so skip vector loop
+    generateS390CompareAndBranchInstruction(cg, TR::InstOpCode::C, node, numCharsLeftReg, 16,
+        TR::InstOpCode::COND_BL, residualLabel, false, false);
+    
+    // Set up VSTRC parameters for detecting negative bytes (0x80-0xFF)
+    // Range: 0x80 to 0xFF (negative bytes in signed interpretation)
+    generateVRIaInstruction(cg, TR::InstOpCode::VREPI, node, vRange, 0x80, 0);  // Replicate 0x80
+    generateVRIaInstruction(cg, TR::InstOpCode::VREPI, node, vRangeControl, 0x20, 0);  // Control: >= comparison
+    
+    // Vector loop: process 16 bytes at a time
+    generateS390LabelInstruction(cg, TR::InstOpCode::label, node, vectorLoopLabel);
+    
+    // Load 16 bytes
+    generateVRXInstruction(cg, TR::InstOpCode::VL, node, vInput,
+        generateS390MemoryReference(arrayReg, indexReg, 0, cg));
+    
+    // VSTRC: Vector String Range Compare
+    // Checks if any byte is >= 0x80 (i.e., has high bit set, meaning negative)
+    // Sets CC=1 if match found, CC=0 if no match
+    generateVRRdInstruction(cg, TR::InstOpCode::VSTRC, node, vResult, vInput, vRange, vRangeControl, 0x1, 0);
+    
+    // If CC=1, we found a negative byte
+    generateS390BranchInstruction(cg, TR::InstOpCode::BRC, TR::InstOpCode::COND_CC1, node, foundNegativeLabel);
+    
+    // No negative found in this chunk, continue
+    generateRXInstruction(cg, TR::InstOpCode::getLoadAddressOpCode(), node, indexReg,
+        generateS390MemoryReference(indexReg, 16, cg));
+    generateRILInstruction(cg, TR::InstOpCode::SLFI, node, numCharsLeftReg, 16);
+    
+    // Check if we have at least 16 more bytes to process
+    generateS390CompareAndBranchInstruction(cg, TR::InstOpCode::C, node, numCharsLeftReg, 15,
+        TR::InstOpCode::COND_BH, vectorLoopLabel, false, false);
+    
+    generateS390LabelInstruction(cg, TR::InstOpCode::label, node, vectorLoopEndLabel);
+    
+    // Handle residual bytes (< 16 bytes remaining)
+    generateS390LabelInstruction(cg, TR::InstOpCode::label, node, residualLabel);
+    
+    // Check if there are any bytes left
+    generateS390CompareAndBranchInstruction(cg, TR::InstOpCode::C, node, numCharsLeftReg, 0,
+        TR::InstOpCode::COND_BE, noNegativeLabel, false, false);
+    
+    // Zero out vector register for partial load
+    generateVRIaInstruction(cg, TR::InstOpCode::VGBM, node, vInput, 0, 0);
+    
+    // Load remaining bytes using VLL (Vector Load with Length)
+    TR::Register *lengthMinus1Reg = cg->allocateRegister();
+    generateRIEInstruction(cg, TR::InstOpCode::AHIK, node, lengthMinus1Reg, numCharsLeftReg, -1);
+    generateVRSbInstruction(cg, TR::InstOpCode::VLL, node, vInput, lengthMinus1Reg,
+        generateS390MemoryReference(arrayReg, indexReg, 0, cg));
+    
+    // Check residual bytes for negatives
+    generateVRRdInstruction(cg, TR::InstOpCode::VSTRC, node, vResult, vInput, vRange, vRangeControl, 0x1, 0);
+    generateS390BranchInstruction(cg, TR::InstOpCode::BRC, TR::InstOpCode::COND_CC1, node, foundNegativeLabel);
+    
+    cg->stopUsingRegister(lengthMinus1Reg);
+    
+    // No negative bytes found
+    generateS390LabelInstruction(cg, TR::InstOpCode::label, node, noNegativeLabel);
+    if (isCountPositives) {
+        // Return the full length
+        generateRRInstruction(cg, TR::InstOpCode::LR, node, resultReg, lengthReg);
+    } else {
+        // Return false (0)
+        generateRILInstruction(cg, TR::InstOpCode::LGFI, node, resultReg, 0);
+    }
+    generateS390BranchInstruction(cg, TR::InstOpCode::BRC, TR::InstOpCode::COND_BRC, node, endLabel);
+    
+    // Found negative byte
+    generateS390LabelInstruction(cg, TR::InstOpCode::label, node, foundNegativeLabel);
+    if (isCountPositives) {
+        // Extract the index of the first negative byte from vResult
+        TR::Register *firstNegativeIndexReg = cg->allocateRegister();
+        generateVRScInstruction(cg, TR::InstOpCode::VLGV, node, firstNegativeIndexReg, vResult,
+            generateS390MemoryReference(7, cg), 0);
+        
+        // Calculate count: index + firstNegativeIndex - offset
+        generateRRInstruction(cg, TR::InstOpCode::LR, node, resultReg, indexReg);
+        generateRRInstruction(cg, TR::InstOpCode::AR, node, resultReg, firstNegativeIndexReg);
+        generateRRInstruction(cg, TR::InstOpCode::SR, node, resultReg, offsetReg);
+        
+        cg->stopUsingRegister(firstNegativeIndexReg);
+    } else {
+        // Return true (1)
+        generateRILInstruction(cg, TR::InstOpCode::LGFI, node, resultReg, 1);
+    }
+    
+    // End label
+    TR::RegisterDependencyConditions *deps = new (cg->trHeapMemory())
+        TR::RegisterDependencyConditions(0, 10, cg);
+    deps->addPostCondition(arrayReg, TR::RealRegister::AssignAny);
+    deps->addPostCondition(offsetReg, TR::RealRegister::AssignAny);
+    deps->addPostCondition(lengthReg, TR::RealRegister::AssignAny);
+    deps->addPostCondition(resultReg, TR::RealRegister::AssignAny);
+    deps->addPostCondition(indexReg, TR::RealRegister::AssignAny);
+    deps->addPostCondition(limitReg, TR::RealRegister::AssignAny);
+    deps->addPostCondition(numCharsLeftReg, TR::RealRegister::AssignAny);
+    deps->addPostCondition(vInput, TR::RealRegister::AssignAny);
+    deps->addPostCondition(vRange, TR::RealRegister::AssignAny);
+    deps->addPostCondition(vRangeControl, TR::RealRegister::AssignAny);
+    
+    generateS390LabelInstruction(cg, TR::InstOpCode::label, node, endLabel, deps);
+    
+    // Decrement reference counts
+    cg->decReferenceCount(arrayNode);
+    cg->decReferenceCount(offsetNode);
+    cg->decReferenceCount(lengthNode);
+    
+    // Stop using temporary registers
+    cg->stopUsingRegister(indexReg);
+    cg->stopUsingRegister(limitReg);
+    cg->stopUsingRegister(numCharsLeftReg);
+    cg->stopUsingRegister(vInput);
+    cg->stopUsingRegister(vRange);
+    cg->stopUsingRegister(vRangeControl);
+    cg->stopUsingRegister(vResult);
+    
+    node->setRegister(resultReg);
+    return resultReg;
+}
+
 
 /* Moved from Codegen to FE */
 ///////////////////////////////////////////////////////////////////////////////////

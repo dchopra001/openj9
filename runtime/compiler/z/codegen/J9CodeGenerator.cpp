@@ -104,6 +104,16 @@ void J9::Z::CodeGenerator::initialize()
         cg->setSupportsInlineStringLatin1Inflate();
     }
 
+    static bool disableInlineStringCodingHasNegatives = feGetEnv("TR_disableInlineStringCodingHasNegatives") != NULL;
+    static bool disableInlineStringCodingCountPositives = feGetEnv("TR_disableInlineStringCodingCountPositives") != NULL;
+
+    if (cg->getSupportsVectorRegisters() && !TR::Compiler->om.canGenerateArraylets()) {
+        if (!disableInlineStringCodingHasNegatives)
+            cg->setSupportsInlineStringCodingHasNegatives();
+        if (!disableInlineStringCodingCountPositives)
+            cg->setSupportsInlineStringCodingCountPositives();
+    }
+
     // For IBM Java 8 ConcurrentLinkedQueue.poll and offer has been accelerated
     // using constrained transactional execution instructions.
     // If CTX feature is supported on processor, and JIT has not disabled it
@@ -3792,6 +3802,18 @@ bool J9::Z::CodeGenerator::inlineDirectCall(TR::Node *node, TR::Register *&resul
             if (cg->getSupportsInlineStringLatin1Inflate()) {
                 resultReg = TR::TreeEvaluator::inlineStringLatin1Inflate(node, cg);
                 return resultReg != NULL;
+            }
+            break;
+        case TR::java_lang_StringCoding_hasNegatives:
+            if (cg->getSupportsInlineStringCodingHasNegatives()) {
+                resultReg = TR::TreeEvaluator::inlineStringCodingHasNegativesOrCountPositives(node, cg, false, false);
+                return true;
+            }
+            break;
+        case TR::java_lang_StringCoding_countPositives:
+            if (cg->getSupportsInlineStringCodingCountPositives()) {
+                resultReg = TR::TreeEvaluator::inlineStringCodingHasNegativesOrCountPositives(node, cg, true, false);
+                return true;
             }
             break;
         case TR::com_ibm_jit_JITHelpers_transformedEncodeUTF16Big:
