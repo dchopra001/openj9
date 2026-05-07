@@ -521,6 +521,19 @@ public:
     void setSupportsInlineStringLatin1Inflate() { _j9Flags.set(SupportsInlineStringLatin1Inflate); }
 
     /** \brief
+     *    Determines whether the code generator supports inlining of java/lang/StringCoding.hasNegatives
+     */
+    bool getSupportsInlineStringCodingHasNegatives()
+    {
+        return _j9Flags.testAny(SupportsInlineStringCodingHasNegatives);
+    }
+
+    /** \brief
+     *    The code generator supports inlining of java/lang/StringCoding.hasNegatives
+     */
+    void setSupportsInlineStringCodingHasNegatives() { _j9Flags.set(SupportsInlineStringCodingHasNegatives); }
+
+    /** \brief
      *    Determines whether the code generator supports inlining of java_util_concurrent_ConcurrentLinkedQueue_tm*
      *    methods
      */
@@ -809,17 +822,18 @@ private:
         SupportsInlineConcurrentLinkedQueue = 0x00000020,
         SupportsBigDecimalLongLookasideVersioning = 0x00000040,
         SupportsInlineStringLatin1Inflate = 0x00000080, /*! codegen inlining of Java StringLatin1.inflate */
-        SupportsIntegerStringSize = 0x00000100,
-        SupportsIntegerToChars = 0x00000200,
-        SupportsInlineEncodeASCII = 0x00000400,
-        SavesNonVolatileGPRsForGC = 0x00000800,
-        SupportsInlineVectorizedMismatch = 0x00001000,
-        SupportsInlineVectorizedHashCode = 0x00002000,
-        SupportsInlineMath_MaxMin_FD = 0x00010000,
-        SupportsInlineUnsafeCompareAndSet = 0x00020000,
-        SupportsInlineUnsafeCompareAndExchange = 0x00040000,
-        SupportsInlineStringIndexOfString = 0x00080000, /*! codegen inlining of Java string index of string */
-        SupportsInlineDecodeToLatin1Impl = 0x00100000,
+        SupportsInlineStringCodingHasNegatives = 0x00000100, /*! codegen inlining of Java StringCoding.hasNegatives */
+        SupportsIntegerStringSize = 0x00000200,
+        SupportsIntegerToChars = 0x00000400,
+        SupportsInlineEncodeASCII = 0x00000800,
+        SavesNonVolatileGPRsForGC = 0x00001000,
+        SupportsInlineVectorizedMismatch = 0x00002000,
+        SupportsInlineVectorizedHashCode = 0x00004000,
+        SupportsInlineMath_MaxMin_FD = 0x00020000,
+        SupportsInlineUnsafeCompareAndSet = 0x00040000,
+        SupportsInlineUnsafeCompareAndExchange = 0x00080000,
+        SupportsInlineStringIndexOfString = 0x00100000, /*! codegen inlining of Java string index of string */
+        SupportsInlineDecodeToLatin1Impl = 0x00200000,
     };
 
     flags32_t _j9Flags;

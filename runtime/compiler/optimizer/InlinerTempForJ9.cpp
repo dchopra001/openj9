@@ -5490,6 +5490,11 @@ bool TR_J9InlinerPolicy::suppressInliningRecognizedInitialCallee(TR_CallSite *ca
                 return true;
             }
             break;
+        case TR::java_lang_StringCoding_hasNegatives:
+            if (cg->getSupportsInlineStringCodingHasNegatives()) {
+                return true;
+            }
+            break;
         default:
             break;
     }

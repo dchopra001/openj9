@@ -99,9 +99,12 @@ void J9::Z::CodeGenerator::initialize()
         cg->setSupportsInlineVectorizedHashCode();
     }
 
+    static bool disableInlineStringCodingHasNegatives = feGetEnv("TR_DisableInlineStringCodingHasNegatives") != NULL;
     if (cg->getSupportsVectorRegisters() && comp->target().cpu.isAtLeast(OMR_PROCESSOR_S390_Z14)
         && !TR::Compiler->om.canGenerateArraylets()) {
         cg->setSupportsInlineStringLatin1Inflate();
+        if (!disableInlineStringCodingHasNegatives)
+            cg->setSupportsInlineStringCodingHasNegatives();
     }
 
     // For IBM Java 8 ConcurrentLinkedQueue.poll and offer has been accelerated
@@ -3791,6 +3794,12 @@ bool J9::Z::CodeGenerator::inlineDirectCall(TR::Node *node, TR::Register *&resul
         case TR::java_lang_StringLatin1_inflate_BICII:
             if (cg->getSupportsInlineStringLatin1Inflate()) {
                 resultReg = TR::TreeEvaluator::inlineStringLatin1Inflate(node, cg);
+                return resultReg != NULL;
+            }
+            break;
+        case TR::java_lang_StringCoding_hasNegatives:
+            if (cg->getSupportsInlineStringCodingHasNegatives()) {
+                resultReg = TR::TreeEvaluator::inlineStringCodingHasNegatives(node, cg);
                 return resultReg != NULL;
             }
             break;

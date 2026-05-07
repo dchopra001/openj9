@@ -291,6 +291,131 @@ void J9::Z::TreeEvaluator::inlineEncodeASCII(TR::Node *node, TR::CodeGenerator *
     cg->stopUsingRegister(firstSaturatedCharacterMinus1GR);
 }
 
+TR::Register *J9::Z::TreeEvaluator::inlineStringCodingHasNegatives(TR::Node *node, TR::CodeGenerator *cg)
+{
+    TR_ASSERT_FATAL(cg->getSupportsInlineStringCodingHasNegatives(),
+        "This evaluator should only be triggered when inlining StringCoding.hasNegatives([BII)Z is enabled.\n");
+
+    TR::Node *arrayReferenceNode = node->getChild(0);
+    TR::Node *offsetNode = node->getChild(1);
+    TR::Node *lenNode = node->getChild(2);
+
+    TR::Register *lenRegister = cg->evaluate(lenNode);
+    TR::Register *arrayReferenceRegister = cg->gprClobberEvaluate(arrayReferenceNode);
+    TR::Register *offsetRegister = cg->gprClobberEvaluate(offsetNode);
+    TR::Register *resultRegister = cg->allocateRegister();
+
+    int32_t offsetToDataElements = TR::Compiler->om.contiguousArrayHeaderSizeInBytes();
+#ifdef J9VM_GC_SPARSE_HEAP_ALLOCATION
+    if (TR::Compiler->om.isOffHeapAllocationEnabled()) {
+        generateRXInstruction(cg, TR::InstOpCode::getLoadOpCode(), node, arrayReferenceRegister,
+            generateS390MemoryReference(arrayReferenceRegister,
+                cg->comp()->fej9()->getOffsetOfContiguousDataAddrField(), cg));
+        offsetToDataElements = 0;
+    }
+#endif /* J9VM_GC_SPARSE_HEAP_ALLOCATION */
+
+    if (offsetNode->getOpCodeValue() == TR::iconst) {
+        if (offsetNode->getInt() != 0) {
+            generateRILInstruction(cg, TR::InstOpCode::AFI, node, arrayReferenceRegister, offsetNode->getInt());
+        }
+    } else {
+        generateRRInstruction(cg, TR::InstOpCode::AGFR, node, arrayReferenceRegister, offsetRegister);
+    }
+
+    TR::Register *vInput = cg->allocateRegister(TR_VRF);
+    TR::Register *vRange = cg->allocateRegister(TR_VRF);
+    TR::Register *vRangeControl = cg->allocateRegister(TR_VRF);
+    TR::Register *firstSaturatedCharacter = cg->allocateRegister(TR_VRF);
+    TR::Register *numBytesLeftToProcess = cg->allocateRegister();
+
+    TR::LabelSymbol *cFlowRegionStart = generateLabelSymbol(cg);
+    TR::LabelSymbol *processMultiple16BytesStart = generateLabelSymbol(cg);
+    TR::LabelSymbol *processMultiple16BytesEnd = generateLabelSymbol(cg);
+    TR::LabelSymbol *processSaturatedInput = generateLabelSymbol(cg);
+    TR::LabelSymbol *returnFalseLabel = generateLabelSymbol(cg);
+    TR::LabelSymbol *cFlowRegionEnd = generateLabelSymbol(cg);
+
+    cFlowRegionStart->setStartInternalControlFlow();
+    cFlowRegionEnd->setEndInternalControlFlow();
+
+    uint32_t saturatedRange = 127;
+    uint8_t saturatedRangeControl = 0x20; // > comparison
+
+    generateRRInstruction(cg, TR::InstOpCode::LR, node, resultRegister, lenRegister);
+    generateRRInstruction(cg, TR::InstOpCode::LR, node, numBytesLeftToProcess, lenRegister);
+
+    generateS390LabelInstruction(cg, TR::InstOpCode::label, node, cFlowRegionStart);
+    generateS390CompareAndBranchInstruction(cg, TR::InstOpCode::C, node, numBytesLeftToProcess, 0,
+        TR::InstOpCode::COND_BE, returnFalseLabel, false, false);
+
+    generateVRIaInstruction(cg, TR::InstOpCode::VREPI, node, vRange, saturatedRange, 0);
+    generateVRIaInstruction(cg, TR::InstOpCode::VREPI, node, vRangeControl, saturatedRangeControl, 0);
+
+    generateS390CompareAndBranchInstruction(cg, TR::InstOpCode::C, node, numBytesLeftToProcess, 16,
+        TR::InstOpCode::COND_BL, processMultiple16BytesEnd, false, false);
+
+    generateS390LabelInstruction(cg, TR::InstOpCode::label, node, processMultiple16BytesStart);
+    generateVRXInstruction(cg, TR::InstOpCode::VL, node, vInput, generateS390MemoryReference(arrayReferenceRegister, 0, cg));
+    generateVRRdInstruction(cg, TR::InstOpCode::VSTRC, node, firstSaturatedCharacter, vInput, vRange, vRangeControl,
+        0x1, 0);
+    generateS390BranchInstruction(cg, TR::InstOpCode::BRC, TR::InstOpCode::COND_CC1, node, processSaturatedInput);
+
+    generateRXInstruction(cg, TR::InstOpCode::getLoadAddressOpCode(), node, arrayReferenceRegister,
+        generateS390MemoryReference(arrayReferenceRegister, 16, cg));
+    generateRILInstruction(cg, TR::InstOpCode::SLFI, node, numBytesLeftToProcess, 16);
+    generateS390CompareAndBranchInstruction(cg, TR::InstOpCode::C, node, numBytesLeftToProcess, 15,
+        TR::InstOpCode::COND_BH, processMultiple16BytesStart, false, false);
+
+    generateS390LabelInstruction(cg, TR::InstOpCode::label, node, processMultiple16BytesEnd);
+    generateS390CompareAndBranchInstruction(cg, TR::InstOpCode::C, node, numBytesLeftToProcess, 0,
+        TR::InstOpCode::COND_BE, returnFalseLabel, false, false);
+
+    generateVRIaInstruction(cg, TR::InstOpCode::VGBM, node, vInput, 0, 0 /*unused*/);
+    TR::Register *numBytesLeftToProcessMinus1 = cg->allocateRegister();
+    generateRIEInstruction(cg, TR::InstOpCode::AHIK, node, numBytesLeftToProcessMinus1, numBytesLeftToProcess, -1);
+    generateVRSbInstruction(cg, TR::InstOpCode::VLL, node, vInput, numBytesLeftToProcessMinus1,
+        generateS390MemoryReference(arrayReferenceRegister, 0, cg));
+    generateVRRdInstruction(cg, TR::InstOpCode::VSTRC, node, firstSaturatedCharacter, vInput, vRange, vRangeControl,
+        0x1, 0);
+    generateS390BranchInstruction(cg, TR::InstOpCode::BRC, TR::InstOpCode::COND_CC1, node, processSaturatedInput);
+
+    generateS390LabelInstruction(cg, TR::InstOpCode::label, node, returnFalseLabel);
+    generateRIInstruction(cg, TR::InstOpCode::LHI, node, resultRegister, 0);
+    generateS390BranchInstruction(cg, TR::InstOpCode::BRC, TR::InstOpCode::COND_BRC, node, cFlowRegionEnd);
+
+    generateS390LabelInstruction(cg, TR::InstOpCode::label, node, processSaturatedInput);
+    generateRIInstruction(cg, TR::InstOpCode::LHI, node, resultRegister, 1);
+
+    TR::RegisterDependencyConditions *dependencies
+        = new (cg->trHeapMemory()) TR::RegisterDependencyConditions(0, 9, cg);
+    dependencies->addPostConditionIfNotAlreadyInserted(vInput, TR::RealRegister::AssignAny);
+    dependencies->addPostConditionIfNotAlreadyInserted(firstSaturatedCharacter, TR::RealRegister::AssignAny);
+    dependencies->addPostConditionIfNotAlreadyInserted(vRange, TR::RealRegister::AssignAny);
+    dependencies->addPostConditionIfNotAlreadyInserted(vRangeControl, TR::RealRegister::AssignAny);
+    dependencies->addPostConditionIfNotAlreadyInserted(arrayReferenceRegister, TR::RealRegister::AssignAny);
+    dependencies->addPostConditionIfNotAlreadyInserted(offsetRegister, TR::RealRegister::AssignAny);
+    dependencies->addPostConditionIfNotAlreadyInserted(numBytesLeftToProcess, TR::RealRegister::AssignAny);
+    dependencies->addPostConditionIfNotAlreadyInserted(numBytesLeftToProcessMinus1, TR::RealRegister::AssignAny);
+    dependencies->addPostConditionIfNotAlreadyInserted(resultRegister, TR::RealRegister::AssignAny);
+
+    generateS390LabelInstruction(cg, TR::InstOpCode::label, node, cFlowRegionEnd, dependencies);
+
+    cg->decReferenceCount(arrayReferenceNode);
+    cg->decReferenceCount(offsetNode);
+    cg->decReferenceCount(lenNode);
+
+    cg->stopUsingRegister(vInput);
+    cg->stopUsingRegister(firstSaturatedCharacter);
+    cg->stopUsingRegister(vRange);
+    cg->stopUsingRegister(vRangeControl);
+    cg->stopUsingRegister(numBytesLeftToProcess);
+    cg->stopUsingRegister(numBytesLeftToProcessMinus1);
+
+    node->setRegister(resultRegister);
+    return resultRegister;
+}
+
 TR::Register *J9::Z::TreeEvaluator::inlineStringLatin1Inflate(TR::Node *node, TR::CodeGenerator *cg)
 {
     static bool disableStringInflate = feGetEnv("TR_DisableStringInflate") != NULL;

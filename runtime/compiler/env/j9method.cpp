@@ -2550,7 +2550,8 @@ void TR_ResolvedJ9Method::construct()
               { x(TR::java_lang_StringCoding_implEncodeAsciiArray, "implEncodeAsciiArray", "([CI[BII)I") },
               { x(TR::java_lang_StringCoding_encode8859_1, "encode8859_1", "(B[B)[B") },
               { x(TR::java_lang_StringCoding_encodeASCII, "encodeASCII", "(B[B)[B") },
-              { x(TR::java_lang_StringCoding_encodeUTF8, "encodeUTF8", "(B[BZ)[B") }, { TR::unknownMethod } };
+              { x(TR::java_lang_StringCoding_encodeUTF8, "encodeUTF8", "(B[BZ)[B") },
+              { x(TR::java_lang_StringCoding_hasNegatives, "hasNegatives", "([BII)Z") }, { TR::unknownMethod } };
 
     static X StringConcatHelperMethods[]
         = { { x(TR::java_lang_StringConcatHelper_newArray, "newArray", "(J)[B") }, { TR::unknownMethod } };
