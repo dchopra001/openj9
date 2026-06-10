@@ -78,6 +78,11 @@ void J9::X86::CodeGenerator::initialize()
     if (!TR::Compiler->om.canGenerateArraylets() && !TR::Compiler->om.isOffHeapAllocationEnabled())
         cg->setSupportsInlineStringLatin1Inflate();
 
+
+    if (comp->target().cpu.supportsFeature(OMR_FEATURE_X86_SSE2) && !TR::Compiler->om.canGenerateArraylets() && !TR::Compiler->om.isOffHeapAllocationEnabled()) {
+        cg->setSupportsInlineStringLatin1CompareToUTF16Values();
+    }
+
     if (comp->requiresSpineChecks()) {
         // Spine check code doesn't officially support codegen register rematerialization
         // yet.  Better spill placement interferes with tracking live spills.

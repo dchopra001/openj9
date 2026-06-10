@@ -13380,6 +13380,11 @@ TR::Register *J9::X86::TreeEvaluator::directCallEvaluator(TR::Node *node, TR::Co
                 return TR::TreeEvaluator::inlineStringLatin1Inflate(node, cg);
             }
             break;
+        case TR::java_lang_StringLatin1_compareToUTF16Values:
+            if (cg->getSupportsInlineStringLatin1CompareToUTF16Values()) {
+                return TR::TreeEvaluator::inlineStringLatin1CompareToUTF16Values(node, cg);
+            }
+            break;
         case TR::java_lang_Math_fma_F:
         case TR::java_lang_Math_fma_D:
         case TR::java_lang_StrictMath_fma_F:
@@ -13605,6 +13610,138 @@ TR::Register *J9::X86::TreeEvaluator::inlineStringLatin1Inflate(TR::Node *node, 
 
     return NULL;
 }
+TR::Register *J9::X86::TreeEvaluator::inlineStringLatin1CompareToUTF16Values(TR::Node *node, TR::CodeGenerator *cg)
+{
+    TR::Compilation *comp = cg->comp();
+    intptr_t headerOffset = TR::Compiler->om.contiguousArrayHeaderSizeInBytes();
+
+    // Evaluate children
+    TR::Register *latin1ArrayReg = cg->evaluate(node->getChild(0));
+    TR::Register *utf16ArrayReg = cg->evaluate(node->getChild(1));
+    TR::Register *len1Reg = cg->gprClobberEvaluate(node->getChild(2), TR::InstOpCode::MOV4RegReg);
+    TR::Register *len2Reg = cg->gprClobberEvaluate(node->getChild(3), TR::InstOpCode::MOV4RegReg);
+
+    TR::Register *limReg = cg->allocateRegister(TR_GPR);
+    TR::Register *indexReg = cg->allocateRegister(TR_GPR);
+    TR::Register *resultReg = cg->allocateRegister(TR_GPR);
+    TR::Register *maskReg = cg->allocateRegister(TR_GPR);
+    TR::Register *c1Reg = cg->allocateRegister(TR_GPR);
+    TR::Register *c2Reg = cg->allocateRegister(TR_GPR);
+
+    TR::Register *xmmLatin1 = cg->allocateRegister(TR_VRF);
+    TR::Register *xmmLatin1Expanded = cg->allocateRegister(TR_VRF);
+    TR::Register *xmmUTF16 = cg->allocateRegister(TR_VRF);
+    TR::Register *xmmZero = cg->allocateRegister(TR_VRF);
+
+    TR::LabelSymbol *startLabel = generateLabelSymbol(cg);
+    TR::LabelSymbol *vectorLoopLabel = generateLabelSymbol(cg);
+    TR::LabelSymbol *residualLabel = generateLabelSymbol(cg);
+    TR::LabelSymbol *residualLoopLabel = generateLabelSymbol(cg);
+    TR::LabelSymbol *foundDifferenceLabel = generateLabelSymbol(cg);
+    TR::LabelSymbol *foundDifferenceScalarLabel = generateLabelSymbol(cg);
+    TR::LabelSymbol *returnLenDiffLabel = generateLabelSymbol(cg);
+    TR::LabelSymbol *doneLabel = generateLabelSymbol(cg);
+
+    startLabel->setStartInternalControlFlow();
+    generateLabelInstruction(TR::InstOpCode::label, node, startLabel, cg);
+
+    generateRegRegInstruction(TR::InstOpCode::MOV4RegReg, node, limReg, len1Reg, cg);
+    generateRegRegInstruction(TR::InstOpCode::CMP4RegReg, node, len1Reg, len2Reg, cg);
+    generateRegRegInstruction(TR::InstOpCode::CMOVG4RegReg, node, limReg, len2Reg, cg);
+
+    // Check for empty comparison
+    generateRegRegInstruction(TR::InstOpCode::TEST4RegReg, node, limReg, limReg, cg);
+    generateLabelInstruction(TR::InstOpCode::JE4, node, returnLenDiffLabel, cg);
+
+    generateRegRegInstruction(TR::InstOpCode::XOR4RegReg, node, indexReg, indexReg, cg);
+
+    generateRegRegInstruction(TR::InstOpCode::PXORRegReg, node, xmmZero, xmmZero, cg);
+
+    TR::Register *loopLimitReg = cg->allocateRegister(TR_GPR);
+    generateRegRegInstruction(TR::InstOpCode::MOV4RegReg, node, loopLimitReg, limReg, cg);
+    generateRegImmInstruction(TR::InstOpCode::AND4RegImm4, node, loopLimitReg, -8, cg);
+
+    generateLabelInstruction(TR::InstOpCode::label, node, vectorLoopLabel, cg);
+
+    // jump to residual handling
+    generateRegRegInstruction(TR::InstOpCode::CMP4RegReg, node, indexReg, loopLimitReg, cg);
+    generateLabelInstruction(TR::InstOpCode::JGE4, node, residualLabel, cg);
+
+    // Load 8 Latin1 bytes into low 64 bits of XMM register
+    generateRegMemInstruction(TR::InstOpCode::MOVQRegMem, node, xmmLatin1,
+        generateX86MemoryReference(latin1ArrayReg, indexReg, 0, headerOffset, cg), cg);
+
+    // Expand Latin1 to UTF16 (8 bytes → 16 bytes)
+    generateRegRegInstruction(TR::InstOpCode::PUNPCKLBWRegReg, node, xmmLatin1, xmmZero, cg);
+    generateRegRegInstruction(TR::InstOpCode::MOVDQURegReg, node, xmmLatin1Expanded, xmmLatin1, cg);
+
+    // Load 16 bytes (8 UTF16 characters) from UTF16 array
+    generateRegMemInstruction(TR::InstOpCode::MOVDQURegMem, node, xmmUTF16,
+        generateX86MemoryReference(utf16ArrayReg, indexReg, 1, headerOffset, cg), cg);
+
+    // Compare vectors element-wise (16 bit)
+    generateRegRegInstruction(TR::InstOpCode::PCMPEQWRegReg, node, xmmLatin1Expanded, xmmUTF16, cg);
+
+    // Extract comparison results to integer
+    generateRegRegInstruction(TR::InstOpCode::PMOVMSKBRegReg, node, maskReg, xmmLatin1Expanded, cg);
+
+    // Check if all elements equal
+    generateRegImmInstruction(TR::InstOpCode::CMP4RegImm4, node, maskReg, 0xFFFF, cg);
+    generateLabelInstruction(TR::InstOpCode::JNE4, node, foundDifferenceLabel, cg);
+
+    generateRegImmInstruction(TR::InstOpCode::ADD4RegImm4, node, indexReg, 8, cg);
+    generateLabelInstruction(TR::InstOpCode::JMP4, node, vectorLoopLabel, cg);
+
+    // Found difference in vector comparison
+    generateLabelInstruction(TR::InstOpCode::label, node, foundDifferenceLabel, cg);
+
+    generateRegInstruction(TR::InstOpCode::NOT4Reg, node, maskReg, cg);
+    generateRegImmInstruction(TR::InstOpCode::AND4RegImm4, node, maskReg, 0xFFFF, cg);
+
+    // Find first set bit
+    // BSF gives bit position
+    generateRegRegInstruction(TR::InstOpCode::BSF4RegReg, node, maskReg, maskReg, cg);
+    generateRegImmInstruction(TR::InstOpCode::SHR4RegImm1, node, maskReg, 1, cg);
+
+    // Calculate actual character index
+    generateRegRegInstruction(TR::InstOpCode::ADD4RegReg, node, indexReg, maskReg, cg);
+
+    // Load the differing characters
+    generateRegMemInstruction(TR::InstOpCode::MOVZXReg4Mem1, node, c1Reg,
+        generateX86MemoryReference(latin1ArrayReg, indexReg, 0, headerOffset, cg), cg);
+
+    // UTF16: load word (2 bytes)
+    generateRegMemInstruction(TR::InstOpCode::MOVZXReg4Mem2, node, c2Reg,
+        generateX86MemoryReference(utf16ArrayReg, indexReg, 1, headerOffset, cg), cg);
+
+    // Compute difference
+    generateRegRegInstruction(TR::InstOpCode::SUB4RegReg, node, c1Reg, c2Reg, cg);
+    generateRegRegInstruction(TR::InstOpCode::MOV4RegReg, node, resultReg, c1Reg, cg);
+    generateLabelInstruction(TR::InstOpCode::JMP4, node, doneLabel, cg);
+
+    // TODO: RESIDUAL
+    generateLabelInstruction(TR::InstOpCode::label, node, doneLabel, deps, cg);
+    doneLabel->setEndInternalControlFlow();
+    
+
+    // Clean up registers
+    cg->stopUsingRegister(limReg);
+    cg->stopUsingRegister(indexReg);
+    cg->stopUsingRegister(maskReg);
+    cg->stopUsingRegister(c1Reg);
+    cg->stopUsingRegister(c2Reg);
+    cg->stopUsingRegister(loopLimitReg);
+    cg->stopUsingRegister(remainReg);
+    cg->stopUsingRegister(xmmLatin1);
+
+    for (int i = 0; i < 4; i++) {
+        cg->decReferenceCount(node->getChild(i));
+    }
+
+    node->setRegister(resultReg);
+    return resultReg;
+}
+
 
 TR::Register *J9::X86::TreeEvaluator::encodeUTF16Evaluator(TR::Node *node, TR::CodeGenerator *cg)
 {
